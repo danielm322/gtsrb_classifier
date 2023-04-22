@@ -1,6 +1,10 @@
 # GTSRB Classifier Experiments Log
 
-## Exp version 122771
+## Experiments log 19/04/2023 - 20/04/2023
+
+Add and test GTSRTB classifier using ResNet18 with DropBlock2D and Dropout.
+
+### Exp version 122771
 
 ```yaml
 arch_name: resnet18
@@ -25,7 +29,7 @@ valid_transforms: null
 test_transforms: null
 ```
 
-## Exp version 122801
+### Exp version 122801
 
 ```yaml
 arch_name: resnet18
@@ -50,7 +54,7 @@ valid_transforms: null
 test_transforms: null
 ```
 
-## Exp version 122805
+### Exp version 122805
 
 ```yaml
 arch_name: resnet18
@@ -86,3 +90,16 @@ self.dropblock2d = LinearScheduler(
                     nr_steps=int(25e3)
                 )
 ```
+
+### Results
+
+The previous experiments were carried out enabling `Dropblock2D` and adding a scheduler to it. However the dropblock probability `drop_prob=0.0` remained unchanged by error. Therefore, all the previous experiments did not include dropout regularization.
+
+
+## Experiments log 21/04/2023
+
+Train new models with:
+
+- DropBlock2D
+- Dropout (linear) in the last fully-connected layer
+- Both DropBlock2D and Dropout

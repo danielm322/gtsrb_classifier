@@ -86,8 +86,12 @@ def main(args):
     #      Get Model Module     #
     #############################
     model_module =  ResnetModule(arch_name=model_type,
-                                 num_classes=num_classes,
                                  input_channels=3,
+                                 num_classes=num_classes,
+                                 dropblock=True,
+                                 dropblock_prob=0.5,
+                                 dropout=True,
+                                 dropout_prob=0.3,
                                  loss_fn=loss_type,
                                  optimizer_lr=1e-4,
                                  optimizer_weight_decay=1e-4,

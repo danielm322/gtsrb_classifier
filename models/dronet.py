@@ -5,25 +5,13 @@ import torch.nn as nn
 from torch.hub import load_state_dict_from_url
 from torch import Tensor
 from dropblock import DropBlock2D, LinearScheduler
+from icecream import ic
 
 
 __all__ = [
     "ResNet",
-    "resnet18",
-    "resnet34",
-    "resnet50",
-    "resnet101",
-    "resnet152"
+    "Dronet8"
 ]
-
-
-model_urls = {
-    'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
-    'resnet34': 'https://download.pytorch.org/models/resnet34-333f7ec4.pth',
-    'resnet50': 'https://download.pytorch.org/models/resnet50-19c8e357.pth',
-    'resnet101': 'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth',
-    'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth'
-}
 
 
 def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
@@ -156,12 +144,12 @@ class Bottleneck(nn.Module):
         return out
 
 
-class ResNet(nn.Module):
+class Dronet(nn.Module):
     def __init__(
         self,
         block: Type[Union[BasicBlock, Bottleneck]],
         layers: List[int],
-        input_channels: int  =3,
+        input_channels: int = 3,
         num_classes: int = 1000,
         zero_init_residual: bool = False,
         groups: int = 1,
@@ -171,14 +159,14 @@ class ResNet(nn.Module):
         dropblock: bool = False,
         dropblock_prob: float = 0.0,
         dropout: bool = False,
-        dropout_prob: float = 0.0
-    ) -> None:
+        dropout_prob: float = 0.0) -> None:
+
         super().__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
 
-        self.inplanes = 64
+        self.inplanes = 32
         self.dilation = 1
         if replace_stride_with_dilation is None:
             # each element in the tuple indicates if we should replace
@@ -197,14 +185,14 @@ class ResNet(nn.Module):
         self.dropout = dropout
         self.dropout_prob = dropout_prob
         # network layers:
-        self.conv1 = nn.Conv2d(self.input_channels, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
+        # self.conv1 = nn.Conv2d(self.input_channels, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(self.input_channels, self.inplanes, kernel_size=5, stride=2, padding=2, bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
+        # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)  # remove max-pooling!
+        self.layer1 = self._make_layer(block, 32, layers[0], stride=2, dilate=replace_stride_with_dilation[0])
+        self.layer2 = self._make_layer(block, 64, layers[1], stride=2, dilate=replace_stride_with_dilation[1])
+        self.layer3 = self._make_layer(block, 128, layers[2], stride=2, dilate=replace_stride_with_dilation[2])
         
         if self.dropblock:
             self.dropblock2d = LinearScheduler(
@@ -213,9 +201,9 @@ class ResNet(nn.Module):
                     stop_value=self.dropblock_prob,
                     nr_steps=int(25e3)
                 )
-        
+
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.fc = nn.Linear(128 * block.expansion, num_classes)
         
         if self.dropout:
             self.dropout_layer = nn.Dropout(p=self.dropout_prob)
@@ -280,46 +268,54 @@ class ResNet(nn.Module):
 
     def _forward_impl(self, x: Tensor) -> Tensor:
         # See note [TorchScript super()]
+        ic(x.shape)
         x = self.conv1(x)
+        ic("conv1: ", x.shape)
         x = self.bn1(x)
         x = self.relu(x)
-        x = self.maxpool(x)
-
-        x1 = self.layer1(x)
-        x2 = self.layer2(x1)
-        x3 = self.layer3(x2)
-        x4 = self.layer4(x3)
+        # x = self.maxpool(x)
+        # ic("maxpool1: ", x.shape)
         
-        if self.dropblock:
-            x4 = self.dropblock2d(x4)
+        x1 = self.layer1(x)
+        ic(x1.shape)
+        x2 = self.layer2(x1)
+        ic(x2.shape)
+        x3 = self.layer3(x2)
+        ic(x3.shape)
 
-        x_avgpool = self.avgpool(x4)
+        if self.dropblock:
+            x3 = self.dropblock2d(x3)
+
+        x_avgpool = self.avgpool(x3)
+        ic(x_avgpool.shape)
         x_flat = torch.flatten(x_avgpool, 1)
         x_out = self.fc(x_flat)
+        ic(x_out.shape)
         
         if self.dropout:
             x_out = self.dropout_layer(x_out)
-
+        
         return x_out
 
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
 
 
-def _resnet(arch_name: str,
+def _dronet(arch_name: str,
             block: Type[Union[BasicBlock, Bottleneck]],
             layers: List[int],
             input_channels: int = 3,
-            num_classes: int = 1000,  # ImageNet-1000
+            num_classes: int = 1000,  # ImageNet
             dropblock: bool = False,
             dropblock_prob: float = 0.0,
             dropout: bool = False,
             dropout_prob: float = 0.0,
             pretrained: bool = False,
+            model_dir: Optional[str] = None,
             progress: bool = True,
             **kwargs):
     
-    model = ResNet(block,
+    model = Dronet(block,
                    layers,
                    input_channels=input_channels,
                    num_classes=num_classes,
@@ -330,30 +326,29 @@ def _resnet(arch_name: str,
                    **kwargs)
     
     if pretrained:
-        state_dict = load_state_dict_from_url(model_urls[arch_name], progress=progress)
+        state_dict = load_state_dict_from_url(model_dir=model_dir, progress=progress)
         model.load_state_dict(state_dict)
     return model
 
 
-def resnet18(input_channels=3,
-             num_classes=1000,
-             dropblock=False,
-             dropblock_prob=0.0,
-             dropout=False,
-             dropout_prob=0.0,
-             pretrained=False,
-             progress=True,
-             **kwargs):
-
+def dronet8(input_channels=3,
+            num_classes=1000,
+            dropblock=False,
+            dropblock_prob=0.0,
+            dropout=False,
+            dropout_prob=0.0,
+            pretrained=False,
+            progress=True,
+            **kwargs):
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    return _resnet('resnet18',
+    return _dronet('Dronet8',
                    BasicBlock,
-                   [2, 2, 2, 2],
+                   [1, 1, 1],
                    input_channels,
                    num_classes,
                    dropblock,
@@ -363,131 +358,15 @@ def resnet18(input_channels=3,
                    pretrained,
                    progress,
                    **kwargs)
-
-
-def resnet34(input_channels=3,
-             num_classes=1000,
-             dropblock=False,
-             dropblock_prob=0.0,
-             dropout=False,
-             dropout_prob=0.0,
-             pretrained=False,
-             progress=True,
-             **kwargs):
-    r"""ResNet-34 model from
-    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-        progress (bool): If True, displays a progress bar of the download to stderr
-    """
-    return _resnet('resnet34',
-                   BasicBlock,
-                   [3, 4, 6, 3],
-                   input_channels,
-                   num_classes,
-                   dropblock,
-                   dropblock_prob,
-                   dropout,
-                   dropout_prob,
-                   pretrained,
-                   progress,
-                   **kwargs)
-
-
-def resnet50(input_channels=3,
-             num_classes=1000,
-             dropblock=False,
-             dropblock_prob=0.0,
-             dropout=False,
-             dropout_prob=0.0,
-             pretrained=False,
-             progress=True,
-             **kwargs):
-    r"""ResNet-50 model from
-    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-        progress (bool): If True, displays a progress bar of the download to stderr
-    """
-    return _resnet('resnet50',
-                   Bottleneck,
-                   [3, 4, 6, 3],
-                   input_channels,
-                   num_classes,
-                   dropblock,
-                   dropblock_prob,
-                   dropout,
-                   dropout_prob,
-                   pretrained,
-                   progress,
-                   **kwargs)
-
-
-def resnet101(input_channels=3,
-              num_classes=1000,
-              dropblock=False,
-              dropblock_prob=0.0,
-              dropout=False,
-              dropout_prob=0.0,
-              pretrained=False,
-              progress=True,
-              **kwargs):
-    r"""ResNet-101 model from
-    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-        progress (bool): If True, displays a progress bar of the download to stderr
-    """
-    return _resnet('resnet101',
-                   Bottleneck,
-                   [3, 4, 23, 3],
-                   input_channels,
-                   num_classes,
-                   dropblock,
-                   dropblock_prob,
-                   dropout,
-                   dropout_prob,
-                   pretrained,
-                   progress,
-                   **kwargs)
-
-
-def resnet152(input_channels=3,
-              num_classes=1000,
-              dropblock=False,
-              dropblock_prob=0.0,
-              dropout=False,
-              dropout_prob=0.0,
-              pretrained=False,
-              progress=True,
-              **kwargs):
-    r"""ResNet-152 model from
-    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-        progress (bool): If True, displays a progress bar of the download to stderr
-    """
-    return _resnet('resnet152',
-                   Bottleneck,
-                   [3, 8, 36, 3],
-                   input_channels,
-                   num_classes,
-                   dropblock,
-                   dropblock_prob,
-                   dropout,
-                   dropout_prob,
-                   pretrained,
-                   progress,
-                   **kwargs)
-
+    
 
 if __name__ == "__main__":
     # resnet18_model = resnet18()
-    # resnet18_model = resnet18(dropblock=True)
-    resnet18_model = resnet18(num_classes=10,
-                              dropblock=True,
-                              dropblock_prob=0.5,
-                              dropout=True,
-                              dropout_prob=0.3)
-    
-    print(resnet18_model)
+    sample = torch.randn(1, 3, 64, 64)
+    dronet8_model = dronet8(num_classes=10,
+                            dropblock=True,
+                            dropblock_prob=0.5,
+                            dropout=True,
+                            dropout_prob=0.3)
+    print(dronet8_model)
+    dronet8_model(sample)

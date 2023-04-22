@@ -15,8 +15,12 @@ class ResnetModule(pl.LightningModule):
     """
     def __init__(self,
                  arch_name :str = 'resnet18',
-                 num_classes: int = 43,
                  input_channels: int = 3,
+                 num_classes: int = 43,
+                 dropblock: bool = False,
+                 dropblock_prob: float = 0.0,
+                 dropout: bool = False,
+                 dropout_prob: float = 0.0,
                  loss_fn: str = 'cross_entropy',
                  optimizer_lr: float = 1e-4,
                  optimizer_weight_decay: float = 1e-5,
@@ -30,17 +34,24 @@ class ResnetModule(pl.LightningModule):
             raise ValueError(f'loss_fn value is not supported. Got "{loss_fn}" value.')
                 
         self.arch_name = arch_name
-        self.num_classes = num_classes
         self.input_channels = input_channels
+        self.num_classes = num_classes
+        self.dropblock = dropblock
+        self.dropblock_prob = dropblock_prob
+        self.dropout = dropout
+        self.dropout_prob = dropout_prob
         self.loss_fn = self.get_loss_fn(loss_fn)
         self.optimizer_lr = optimizer_lr
         self.optimizer_weight_decay = optimizer_weight_decay
         self.max_nro_epochs = max_nro_epochs
         # ToDo: add different types of models
         # model: dataset has 43 classes, input is RGB  images (3 channels)
-        self.model = resnet18(num_classes=self.num_classes,
-                              input_channels=self.input_channels,
-                              dropblock=True) 
+        self.model = resnet18(input_channels=self.input_channels,
+                              num_classes=self.num_classes,
+                              dropblock=self.dropblock,
+                              dropblock_prob=self.dropblock_prob,
+                              dropout=self.dropout,
+                              dropout_prob=self.dropout_prob) 
         # add Accuracy Metric
         self.metric_accuracy = torchmetrics.Accuracy(num_classes=self.num_classes)
         
