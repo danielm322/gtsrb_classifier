@@ -7,6 +7,7 @@ from pytorch_lightning.utilities.types import STEP_OUTPUT, EPOCH_OUTPUT
 import torchmetrics
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from .resnet_custom import resnet18
+from loss import FocalLoss
 
 
 class ResnetModule(pl.LightningModule):
@@ -63,8 +64,8 @@ class ResnetModule(pl.LightningModule):
             loss_fn = nn.NLLLoss(reduction='mean')
         elif loss_type == "cross_entropy":
             loss_fn = nn.CrossEntropyLoss(reduction='mean')
-        elif loss_type == "focal_loss":
-            raise ValueError(f' Loss function {loss_type} not supported yet')
+        elif loss_type == "focal":
+            loss_fn = FocalLoss(gamma=4.0, reduction='mean')
         else:
             raise ValueError(f' Loss function value is not supported, use a valid loss function')
 
@@ -76,8 +77,8 @@ class ResnetModule(pl.LightningModule):
                                      weight_decay=self.optimizer_weight_decay,  # L2 penalty regularizer
                                      eps=1e-7)  # adds numerical numerical stability (avoids division by 0)
         lr_scheduler = {"scheduler": CosineAnnealingLR(optimizer,
-                                                T_max=self.max_nro_epochs,
-                                                eta_min=2.3e-5)}
+                                                       T_max=self.max_nro_epochs,
+                                                       eta_min=1e-5)}
         return [optimizer], [lr_scheduler]
     
     def training_step(self, batch: Any, batch_idx: int) -> STEP_OUTPUT:

@@ -93,7 +93,7 @@ self.dropblock2d = LinearScheduler(
 
 ### Results
 
-The previous experiments were carried out enabling `Dropblock2D` and adding a scheduler to it. However the dropblock probability `drop_prob=0.0` remained unchanged by error. Therefore, all the previous experiments did not include dropout regularization.
+The previous experiments were carried out enabling `DropBlock2D` and adding a scheduler to it. However, the dropblock probability `drop_prob=0.0` remained unchanged by error. Therefore, all the previous experiments did not include dropout regularization.
 
 
 ## Experiments log 21/04/2023
