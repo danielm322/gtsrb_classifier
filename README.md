@@ -16,6 +16,7 @@ albumentations==1.2.1
 dropblock==0.3.0
 lightning-bolts==0.5.0
 pytorch-lightning==1.7.2
+rich==12.5.1
 tensorboard==2.10.0
 torch==1.12.1
 torchmetrics==0.10.0rc0
