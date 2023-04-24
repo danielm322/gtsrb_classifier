@@ -61,7 +61,6 @@ KDEpy==1.1.0
 kiwisolver==1.4.4
 lightning-bolts==0.5.0
 llvmlite==0.39.1
-ls-ood-detect-cea @ file:///home/farnez/Projects/Confiance-AI/DNN_OoD_Detection_CEA
 Markdown==3.4.1
 MarkupSafe==2.1.1
 matplotlib==3.5.3
