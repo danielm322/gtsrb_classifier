@@ -28,6 +28,7 @@ For a detailed list of requirements, check and use the following files:
 
 - `requirements-pip-local.txt` to install requirements on a local PC with pip.
 - `requirements-conda-FAI.txt` to install requirements on Factory-AI with conda.
+- `requirements-cpu-only.txt` to install on local pc with only cpu.
 
 
 ## Usage

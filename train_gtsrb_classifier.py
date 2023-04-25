@@ -42,7 +42,8 @@ def main(args):
     ############################
     #      Seed Everything     #
     ############################
-    torch.cuda.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     pl.seed_everything(random_seed_everything)
     #######################################
     #      Training Monitor/Callbacks     #
@@ -115,7 +116,7 @@ def main(args):
 
     else:  # training locally in computer with GPU
         ic(slurm_training)
-        trainer = pl.Trainer(accelerator='gpu',
+        trainer = pl.Trainer(accelerator='gpu' if torch.cuda.is_available() else None,
                              devices=gpus_nro,
                              max_epochs=max_nro_epochs,
                              callbacks=[progress_bar,
