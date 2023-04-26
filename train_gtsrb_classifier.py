@@ -11,7 +11,7 @@ from pytorch_lightning.plugins.environments import SLURMEnvironment
 from models import ResnetModule
 from datasets import GtsrbModule
 from icecream import ic
-
+import mlflow.pytorch
 
 def main(args):
     #####################
@@ -73,9 +73,9 @@ def main(args):
     #      Get Dataset Module     #
     ###############################
     data_module = GtsrbModule(data_path=dataset_path,
-                              img_size=(32, 32),
+                              img_size=(args.image_width, args.image_height),
                               batch_size=batch_size,
-                              shuffle=True)
+                              shuffle=args.shuffle)
 
     data_module.setup(stage="fit")
     data_module.setup(stage="validate")
@@ -87,15 +87,15 @@ def main(args):
     #      Get Model Module     #
     #############################
     model_module =  ResnetModule(arch_name=model_type,
-                                 input_channels=3,
+                                 input_channels=args.input_channels,
                                  num_classes=num_classes,
-                                 dropblock=True,
-                                 dropblock_prob=0.5,
-                                 dropout=True,
-                                 dropout_prob=0.3,
+                                 dropblock=args.drop_block,
+                                 dropblock_prob=args.dropblock_prob,
+                                 dropout=args.dropout,
+                                 dropout_prob=args.dropout_prob,
                                  loss_fn=loss_type,
-                                 optimizer_lr=1e-4,
-                                 optimizer_weight_decay=1e-4,
+                                 optimizer_lr=args.learning_rate,
+                                 optimizer_weight_decay=args.optimizer_weight_decay,
                                  max_nro_epochs=max_nro_epochs)
     
     ########################################
@@ -129,6 +129,8 @@ def main(args):
 
 
 if __name__ == "__main__":
+    mlflow.pytorch.autolog(log_every_n_step=400)
     args = argpument_parser()
+    for key, value in vars(args).items():
+        mlflow.log_param(key, value)
     main(args)
-
