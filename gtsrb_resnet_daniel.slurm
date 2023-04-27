@@ -7,7 +7,7 @@
 #SBATCH --mem=16G
 #SBATCH --gres=gpu:4
 #SBATCH --mail-type=ALL
-SBATCH --mail-user=daniel-alfonso.montoyavasquez@cea.fr
+#SBATCH --mail-user=daniel-alfonso.montoyavasquez@cea.fr
 
 echo "Starting commands!"
 pwd;hostname
