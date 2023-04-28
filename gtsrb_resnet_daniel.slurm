@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=16G
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:2
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=daniel-alfonso.montoyavasquez@cea.fr
 
@@ -39,7 +39,7 @@ printf "\n"
 # nvidia-smi
 # printf "\n"
 printf "Start training:"
-srun --kill-on-bad-exit=1 python train_gtsrb_classifier.py trainer.epochs=500 datamodule.batch_size=64 slurm=True trainer.gpus=1
+srun --kill-on-bad-exit=1 python train_gtsrb_classifier.py trainer.epochs=500 datamodule.batch_size=64 slurm=True trainer.gpus=2
 
 # dmesg -T
 printf "\n"
