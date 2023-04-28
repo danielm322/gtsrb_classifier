@@ -22,7 +22,7 @@ module list
 
 # With Slurm jobs, your ~/.bashrc is not sourced, so it doesn’t initialize the shell for Conda environments
 eval "$(conda shell.bash hook)"
-conda activate gtsrb_env
+conda activate gtsrb_pip_env
 
 echo "list conda-envs explicit paths:"
 conda info --envs
