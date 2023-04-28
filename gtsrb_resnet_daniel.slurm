@@ -39,7 +39,7 @@ printf "\n"
 # nvidia-smi
 # printf "\n"
 printf "Start training:"
-srun --kill-on-bad-exit=1 python train_gtsrb_classifier.py trainer.epochs=500 datamodule.batch_size=64 slurm=True trainer.gpus=2
+srun --kill-on-bad-exit=1 python train_gtsrb_classifier.py trainer.epochs=500 datamodule.batch_size=64 slurm=True trainer.gpus=2 model.lr=5e-5
 
 # dmesg -T
 printf "\n"
