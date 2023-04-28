@@ -80,7 +80,86 @@ def argpument_parser():
         action='store_true',
         help='TQMD Progress bar')
     argparser.set_defaults(rich_progbar=False)
-    
+
+    ####################################################################################
+    # Model hyper-parameters added here to improve traceability
+    ####################################################################################
+    argparser.add_argument(
+        '--input-channels',
+        dest='input_channels',
+        default=3,
+        type=int,
+        help='Input channels'
+    )
+
+    argparser.add_argument(
+        '--drop-block',
+        dest='drop_block',
+        action='store_true',
+        help='Dropblock module')
+    argparser.set_defaults(drop_block=True)
+
+    argparser.add_argument(
+        '--dropblock-prob',
+        dest='dropblock_prob',
+        default=0.5,
+        type=float,
+        help='Dropblock probability'
+    )
+
+    argparser.add_argument(
+        '--dropout',
+        dest='dropout',
+        action='store_true',
+        help='use dropout')
+    argparser.set_defaults(dropout=True)
+
+    argparser.add_argument(
+        '--dropout-prob',
+        dest='dropout_prob',
+        default=0.3,
+        type=float,
+        help='Dropout probability'
+    )
+
+    argparser.add_argument(
+        '-lr',
+        '--learning-rate',
+        dest='learning_rate',
+        default=1e-4,
+        type=float,
+        help='Learning rate'
+    )
+
+    argparser.add_argument(
+        '--weight-decay',
+        dest='optimizer_weight_decay',
+        default=1e-4,
+        type=float,
+        help='Optimizer weight decay'
+    )
+
+    argparser.add_argument(
+        '--image-width',
+        dest='image_width',
+        default=32,
+        type=int,
+        help='Image width'
+    )
+    argparser.add_argument(
+        '--image-height',
+        dest='image_height',
+        default=32,
+        type=int,
+        help='Image height'
+    )
+
+    argparser.add_argument(
+        '--shuffle',
+        dest='shuffle',
+        action='store_true',
+        help='Shuffle dataset')
+    argparser.set_defaults(shuffle=True)
     # parse all the arguments
     arguments = argparser.parse_args()
     

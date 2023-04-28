@@ -1,4 +1,3 @@
-from argument_parser import argpument_parser
 import torch
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -11,21 +10,27 @@ from pytorch_lightning.plugins.environments import SLURMEnvironment
 from models import ResnetModule
 from datasets import GtsrbModule
 from icecream import ic
+import mlflow.pytorch
+import hydra
+from omegaconf import DictConfig
+from helper_functions import log_params_from_omegaconf_dict
 
 
-def main(args):
+@hydra.main(version_base=None, config_path="configs/", config_name="config.yaml")
+def main(cfg: DictConfig) -> None:
+
     #####################
     #      Get Args     #
     #####################
-    model_type = args.model
-    max_nro_epochs = args.epochs
-    batch_size = args.batch_size
-    random_seed_everything = args.random_seed
-    dataset_path = args.dataset_path
-    loss_type = args.loss_type
-    rich_progbar = args.rich_progbar
-    slurm_training = args.slurm_training
-    gpus_nro = args.gpus
+    model_type = cfg.model.model_name
+    max_nro_epochs = cfg.trainer.epochs
+    batch_size = cfg.datamodule.batch_size
+    random_seed_everything = cfg.seed
+    dataset_path = cfg.data_dir
+    loss_type = cfg.model.loss_type
+    rich_progbar = cfg.rich_progbar
+    slurm_training = cfg.slurm
+    gpus_nro = cfg.trainer.gpus
 
     print(' ')
     print('=' * 60)
@@ -38,7 +43,7 @@ def main(args):
     ic(gpus_nro)
     print('=' * 60)
     print(' ')
-    
+
     ############################
     #      Seed Everything     #
     ############################
@@ -48,56 +53,56 @@ def main(args):
     #######################################
     #      Training Monitor/Callbacks     #
     #######################################
-    checkpoint_callback = ModelCheckpoint(monitor="Validation loss",
-                                          mode='min',
-                                          every_n_epochs=1,
-                                          save_top_k=2,
-                                          save_last=True,
-                                          save_on_train_epoch_end=False)
-    
-    monitor = TrainingDataMonitor(log_every_n_steps=20)
+    checkpoint_callback = ModelCheckpoint(monitor=cfg.callbacks.model_checkpoint.monitor,
+                                          mode=cfg.callbacks.model_checkpoint.mode,
+                                          every_n_epochs=cfg.callbacks.model_checkpoint.every_n_epochs,
+                                          save_top_k=cfg.callbacks.model_checkpoint.save_top_k,
+                                          save_last=cfg.callbacks.model_checkpoint.save_last,
+                                          save_on_train_epoch_end=cfg.callbacks.model_checkpoint.save_on_train_epoch_end)
+
+    monitor = TrainingDataMonitor(log_every_n_steps=cfg.trainer.log_every_n_step)
     lr_monitor = LearningRateMonitor(logging_interval='epoch')
-    
+
     if rich_progbar:  # fancy aesthetic progress bar
         progress_bar = RichProgressBar(theme=RichProgressBarTheme(description="green_yellow",
-                                                            progress_bar="green1",
-                                                            progress_bar_finished="green1",
-                                                            batch_progress="green_yellow",
-                                                            time="grey82",
-                                                            processing_speed="grey82",
-                                                            metrics="grey82"))
+                                                                  progress_bar="green1",
+                                                                  progress_bar_finished="green1",
+                                                                  batch_progress="green_yellow",
+                                                                  time="grey82",
+                                                                  processing_speed="grey82",
+                                                                  metrics="grey82"))
     else:  # normal aesthetic progress bar
-        progress_bar = TQDMProgressBar(refresh_rate=10)     
-        
+        progress_bar = TQDMProgressBar(refresh_rate=cfg.trainer.progress_bar_refresh_rate)
+
     ###############################
     #      Get Dataset Module     #
     ###############################
     data_module = GtsrbModule(data_path=dataset_path,
-                              img_size=(32, 32),
-                              batch_size=batch_size,
-                              shuffle=True)
+                              img_size=(cfg.datamodule.image_width, cfg.datamodule.image_height),
+                              batch_size=cfg.datamodule.batch_size,
+                              shuffle=cfg.datamodule.shuffle)
 
     data_module.setup(stage="fit")
     data_module.setup(stage="validate")
     data_module.setup(stage="test")
-    
+
     num_classes = len(data_module.ds_gtsrb_train.classes)
     ic(num_classes)
     #############################
     #      Get Model Module     #
     #############################
-    model_module =  ResnetModule(arch_name=model_type,
-                                 input_channels=3,
-                                 num_classes=num_classes,
-                                 dropblock=True,
-                                 dropblock_prob=0.5,
-                                 dropout=True,
-                                 dropout_prob=0.3,
-                                 loss_fn=loss_type,
-                                 optimizer_lr=1e-4,
-                                 optimizer_weight_decay=1e-4,
-                                 max_nro_epochs=max_nro_epochs)
-    
+    model_module = ResnetModule(arch_name=model_type,
+                                input_channels=cfg.model.input_channels,
+                                num_classes=num_classes,
+                                dropblock=cfg.model.drop_block,
+                                dropblock_prob=cfg.model.dropblock_prob,
+                                dropout=cfg.model.dropout,
+                                dropout_prob=cfg.model.dropout_prob,
+                                loss_fn=cfg.model.loss_type,
+                                optimizer_lr=cfg.model.lr,
+                                optimizer_weight_decay=cfg.model.weight_decay,
+                                max_nro_epochs=max_nro_epochs)
+
     ########################################
     #      Start Module/Model Training     #
     ########################################
@@ -106,13 +111,13 @@ def main(args):
         trainer = pl.Trainer(accelerator='gpu',
                              devices=gpus_nro,
                              num_nodes=1,
-                             strategy='ddp',
+                             strategy=cfg.trainer.distributed_strategy,
                              max_epochs=max_nro_epochs,
                              callbacks=[progress_bar,
                                         checkpoint_callback,
                                         monitor,
                                         lr_monitor],
-                             plugins=[SLURMEnvironment(auto_requeue=False)])
+                             plugins=[SLURMEnvironment(auto_requeue=cfg.trainer.slurm_auto_requeue)])
 
     else:  # training locally in computer with GPU
         ic(slurm_training)
@@ -124,11 +129,13 @@ def main(args):
                                         monitor,
                                         lr_monitor])
 
+    # Log parameters with mlflow
+    log_params_from_omegaconf_dict(cfg)
+    # Setup automatic logging of training with mlflow
+    mlflow.pytorch.autolog(log_every_n_step=cfg.trainer.log_every_n_step)
     # Fit Trainer
     trainer.fit(model=model_module, datamodule=data_module)  # fit a model!
 
 
 if __name__ == "__main__":
-    args = argpument_parser()
-    main(args)
-
+    main()
