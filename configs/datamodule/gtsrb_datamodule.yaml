@@ -1,0 +1,5 @@
+data_dir: ${data_dir}
+batch_size: 16
+image_width: 32
+image_height: 32
+shuffle: True

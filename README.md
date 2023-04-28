@@ -22,6 +22,8 @@ torch==1.12.1
 torchmetrics==0.10.0rc0
 torchvision==0.13.1
 tqdm==4.64.0
+hydra-core==1.3.2
+mlflow==1.30.0
 ```
 
 For a detailed list of requirements, check and use the following files:

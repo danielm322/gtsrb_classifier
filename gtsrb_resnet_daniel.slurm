@@ -39,7 +39,7 @@ printf "\n"
 # nvidia-smi
 # printf "\n"
 printf "Start training:"
-srun --kill-on-bad-exit=1 python train_gtsrb_classifier.py -e 500 -b 64 --loss_type cross_entropy -p /home/users/daniel/Projects/data/gtsrb-data/ --slurm --gpus 2
+srun --kill-on-bad-exit=1 python train_gtsrb_classifier.py trainer.epochs=500 datamodule.batch_size=64 slurm=True trainer.gpus=1
 
 # dmesg -T
 printf "\n"
