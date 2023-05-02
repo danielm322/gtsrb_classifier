@@ -28,23 +28,50 @@ mlflow==1.30.0
 
 For a detailed list of requirements, check and use the following files:
 
-- `requirements-pip-local.txt` to install requirements on a local PC with pip.
+*Update:* For factory AI use, the `requirements-pip-local-FAI.txt` file works fine (Use instructions below).
+
+- `requirements-pip-local-FAI.txt` to install requirements on a local PC with pip and GPU or on Factory AI
 - `requirements-conda-FAI.txt` to install requirements on Factory-AI with conda.
 - `requirements-cpu-only.txt` to install on local pc with only cpu.
 
+## Factory AI setup instructions
+As tested on 28 of april 2023, the following instructions have worked succesfully to prepare an 
+environment in Factory AI:
 
-## Usage
+* Upload code if you haven't done it yet. For uploading the code you can copy it with `scp` following instructions from factory AI. 
+Another option is to use a mirror repository from where you can clone and synchronize code.
+* Upload dataset if you haven't done it yet with `scp` following instructions from factory AI.
 
-Run training script locally on a PC or laptop with GPU:
+* Load conda module: 
+```bash
+module load anaconda/4.9.3
+```
+* Load CUDA module:
+```bash
+module load cuda/11.6
+```
+
+* Create and activate conda environment with python 3.7:
+```bash
+conda create -n gtsrb_env python=3.7
+conda activate gtsrb_env
+```
+
+* Install requirements with pip:
+```bash
+pip install -r requirements-pip-local-FAI.txt
+```
+* Launch the training script with 2 GPUs has proven to be launched immediately (no waiting time). So edit your 
+slurm script accordingly. See `gtsrb_resnet_daniel.slurm` and `gtsrb_resnet.slurm` for details. 
+Be sure to write your own mail, your own path to the environment, the correct number of gpus, etc.
+
+**Note:** Since the integration with hydra and mlflow, you can edit the hyperparameters directly on the configuration files,
+or pass them in the command line (see `gtsrb_resnet_daniel.slurm` to see the hydra syntax for command line parameters). 
+And you do not have to worry about logging these hyperparameters as they will be automatically logged by both of these libraries.
+
+## Use in local pc
+After creating your environment either for cpu or gpu, run training script locally on a PC or laptop:
 
 ```bash
 >$ python3 train_gtsrb_classifier.py
 ```
-
-Run training script (slurm script) in HPC (Factory-AI) with 4 GPUs:
-
-```bash
->$ sbatch gtsrb_resnet.slurm
-```
-
-- For more details about the employed HPC resources, check the `gtsrb_resnet.slurm` script.
