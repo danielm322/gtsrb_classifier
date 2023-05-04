@@ -14,6 +14,7 @@ import mlflow.pytorch
 import hydra
 from omegaconf import DictConfig
 from helper_functions import log_params_from_omegaconf_dict
+from datetime import datetime
 
 
 @hydra.main(version_base=None, config_path="configs/", config_name="config.yaml")
@@ -31,6 +32,8 @@ def main(cfg: DictConfig) -> None:
     rich_progbar = cfg.rich_progbar
     slurm_training = cfg.slurm
     gpus_nro = cfg.trainer.gpus
+    # Get current date time to synchronize pl logs and mlflow
+    current_date_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     print(' ')
     print('=' * 60)
@@ -53,7 +56,8 @@ def main(cfg: DictConfig) -> None:
     #######################################
     #      Training Monitor/Callbacks     #
     #######################################
-    checkpoint_callback = ModelCheckpoint(monitor=cfg.callbacks.model_checkpoint.monitor,
+    checkpoint_callback = ModelCheckpoint(dirpath='lightning_logs/' + current_date_time,
+                                          monitor=cfg.callbacks.model_checkpoint.monitor,
                                           mode=cfg.callbacks.model_checkpoint.mode,
                                           every_n_epochs=cfg.callbacks.model_checkpoint.every_n_epochs,
                                           save_top_k=cfg.callbacks.model_checkpoint.save_top_k,
