@@ -295,10 +295,11 @@ class ResNet(nn.Module):
 
         x_avgpool = self.avgpool(x4)
         x_flat = torch.flatten(x_avgpool, 1)
-        x_out = self.fc(x_flat)
-        
+
         if self.dropout:
-            x_out = self.dropout_layer(x_out)
+            x_flat = self.dropout_layer(x_flat)
+
+        x_out = self.fc(x_flat)
 
         return x_out
 
