@@ -1,4 +1,4 @@
-from typing import Tuple, List, Any, Optional
+from typing import Tuple, List, Any, Optional, Callable
 import os
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -196,7 +196,6 @@ class GTSRBLoader(torch.utils.data.Dataset):
         self.label_list = [int(line.strip().split()[1]) for line in open(image_path, 'r')]
         assert len(self.image_list) == len(self.label_list)
 
-
     # get raw image prior to normalization
     # expects input image as torch Tensor
     def unprocess_image(self, im, plot=False):
@@ -343,7 +342,6 @@ class GtsrbMinimalisticModule(LightningDataModule):
         else:  # 'predict' -> do nothing!
             pass
 
-
     def train_dataloader(self) -> TRAIN_DATALOADERS:
         # if self.split is not "train":
         #     raise ValueError(f'Only "train" split value is supported to get this dataloader. Got {self.split}.')
@@ -471,11 +469,12 @@ class GtsrbModule(LightningDataModule):
                  data_path: str = "data_path",
                  img_size: tuple = (32, 32),
                  batch_size: int = 32,
-                 num_workers:int = 10,
+                 num_workers: int = 10,
                  seed: int = 10,
                  shuffle: bool = False,
                  pin_memory: bool = True,
                  custom_transforms: bool = False,
+                 anomaly_transforms: bool = False,
                  train_transforms=None,
                  valid_transforms=None,
                  test_transforms=None) -> None:
@@ -518,13 +517,13 @@ class GtsrbModule(LightningDataModule):
         self.ds_gtsrb_valid = None
         self.ds_gtsrb_test = None
         self.custom_transforms = custom_transforms
+        self.anomaly_transforms = anomaly_transforms
         self.norm_mean = np.array([0.3337, 0.3064, 0.3171])  # normalization mean
         self.norm_std = np.array([0.2672, 0.2564, 0.2629])  # normalization standard-deviation
         self.train_transforms = train_transforms if custom_transforms else self.get_default_transforms(split='train')
         self.valid_transforms = valid_transforms if custom_transforms else self.get_default_transforms(split='valid')
         self.test_transforms = test_transforms if custom_transforms else self.get_default_transforms(split='test')
         self.save_hyperparameters()
-
 
     def setup(self, stage: Optional[str] = None) -> None:
         
@@ -533,16 +532,21 @@ class GtsrbModule(LightningDataModule):
         
         if stage == "fit":
             self.ds_gtsrb_train = ImageFolder(self.data_path + "train_images/",
-                                              transform=Transforms(self.train_transforms))
+                                              transform=Transforms(self._anomaly_transforms()
+                                                                   if self.anomaly_transforms
+                                                                   else self.train_transforms))
         elif stage == "validate":
             self.ds_gtsrb_valid = ImageFolder(self.data_path + "val_images/",
-                                              transform=Transforms(self.valid_transforms))
+                                              transform=Transforms(self._anomaly_transforms()
+                                                                   if self.anomaly_transforms
+                                                                   else self.valid_transforms))
         elif stage == "test":
             self.ds_gtsrb_test = ImageFolder(self.data_path + "test_images/",
-                                             transform=Transforms(self.test_transforms))
+                                             transform=Transforms(self._anomaly_transforms()
+                                                                  if self.anomaly_transforms
+                                                                  else self.test_transforms))
         else:  # 'predict' -> do nothing!
             pass
-
 
     def train_dataloader(self) -> TRAIN_DATALOADERS:
         
@@ -554,11 +558,11 @@ class GtsrbModule(LightningDataModule):
 
         return train_loader
 
-
     def val_dataloader(self) -> EVAL_DATALOADERS:
        
         valid_loader = DataLoader(self.ds_gtsrb_valid,
                                   batch_size=self.batch_size,
+                                  shuffle=False,
                                   num_workers=self.num_workers,
                                   pin_memory=self.pin_memory)
         
@@ -568,11 +572,11 @@ class GtsrbModule(LightningDataModule):
         
         test_loader = DataLoader(self.ds_gtsrb_test,
                                  batch_size=self.batch_size,
+                                 shuffle=False,
                                  num_workers=self.num_workers,
                                  pin_memory=self.pin_memory)
         
         return test_loader
-
 
     def get_default_transforms(self, split):
         """
@@ -605,6 +609,30 @@ class GtsrbModule(LightningDataModule):
                     ToTensorV2()
                 ]
             )
+
+    def _anomaly_transforms(self) -> Callable:
+        gtsrb_anomaly_transforms = A.Compose(
+            [
+                A.Resize(self.img_size[0], self.img_size[1], p=1),
+                A.OneOf([
+                    A.MotionBlur(blur_limit=13, always_apply=True, p=1.0),
+                    A.RandomSunFlare(flare_roi=(0.3, 0.1, 0.7, 0.9),
+                                     src_radius=int(self.img_size[1] * 0.6),
+                                     num_flare_circles_lower=10,
+                                     num_flare_circles_upper=12,
+                                     angle_lower=0.5,
+                                     p=1.0),
+                    A.RandomSnow(brightness_coeff=2.5,
+                                 snow_point_lower=0.6,
+                                 snow_point_upper=0.8,
+                                 p=1.0)
+                ], p=1.0),
+                A.Normalize(mean=self.norm_mean, std=self.norm_std),
+                ToTensorV2()
+            ]
+        )
+
+        return gtsrb_anomaly_transforms
             
     def unprocess_image(self, im, plot=False):
         # im = im.squeeze().numpy().transpose((1, 2, 0))

@@ -1,5 +1,11 @@
 # ignore ALL .pyc files
 *.pyc
 # ignore ALL files in ANY directory named:
+.idea/
 __pycache__/
+lightning_logs/
 version_*/
+logs_hydra/
+logs_hydra/runs/Default/
+.hydra/
+mlruns/
