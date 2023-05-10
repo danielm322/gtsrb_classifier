@@ -562,7 +562,7 @@ class GtsrbModule(LightningDataModule):
        
         valid_loader = DataLoader(self.ds_gtsrb_valid,
                                   batch_size=self.batch_size,
-                                  shuffle=self.shuffle,
+                                  shuffle=False,
                                   num_workers=self.num_workers,
                                   pin_memory=self.pin_memory)
         
@@ -572,7 +572,7 @@ class GtsrbModule(LightningDataModule):
         
         test_loader = DataLoader(self.ds_gtsrb_test,
                                  batch_size=self.batch_size,
-                                 shuffle=self.shuffle,
+                                 shuffle=False,
                                  num_workers=self.num_workers,
                                  pin_memory=self.pin_memory)
         
