@@ -20,6 +20,7 @@ class ResnetModule(pl.LightningModule):
                  num_classes: int = 43,
                  dropblock: bool = False,
                  dropblock_prob: float = 0.0,
+                 dropblock_block_size: int = 2,
                  dropout: bool = False,
                  dropout_prob: float = 0.0,
                  loss_fn: str = 'cross_entropy',
@@ -39,6 +40,7 @@ class ResnetModule(pl.LightningModule):
         self.num_classes = num_classes
         self.dropblock = dropblock
         self.dropblock_prob = dropblock_prob
+        self.dropblock_block_size = dropblock_block_size
         self.dropout = dropout
         self.dropout_prob = dropout_prob
         self.loss_fn = self.get_loss_fn(loss_fn)
@@ -51,6 +53,7 @@ class ResnetModule(pl.LightningModule):
                               num_classes=self.num_classes,
                               dropblock=self.dropblock,
                               dropblock_prob=self.dropblock_prob,
+                              dropblock_block_size=self.dropblock_block_size,
                               dropout=self.dropout,
                               dropout_prob=self.dropout_prob) 
         # add Accuracy Metric

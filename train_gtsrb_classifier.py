@@ -100,6 +100,7 @@ def main(cfg: DictConfig) -> None:
                                 num_classes=num_classes,
                                 dropblock=cfg.model.drop_block,
                                 dropblock_prob=cfg.model.dropblock_prob,
+                                dropblock_block_size=cfg.model.dropblock_block_size,
                                 dropout=cfg.model.dropout,
                                 dropout_prob=cfg.model.dropout_prob,
                                 loss_fn=cfg.model.loss_type,

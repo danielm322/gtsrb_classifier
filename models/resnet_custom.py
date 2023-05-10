@@ -5,6 +5,7 @@ import torch.nn as nn
 from torch.hub import load_state_dict_from_url
 from torch import Tensor
 from dropblock import DropBlock2D, LinearScheduler
+from icecream import ic
 
 
 __all__ = [
@@ -170,6 +171,7 @@ class ResNet(nn.Module):
         norm_layer: Optional[Callable[..., nn.Module]] = None,
         dropblock: bool = False,
         dropblock_prob: float = 0.0,
+        dropblock_block_size: int = 2,
         dropout: bool = False,
         dropout_prob: float = 0.0
     ) -> None:
@@ -194,6 +196,7 @@ class ResNet(nn.Module):
         self.input_channels = input_channels
         self.dropblock = dropblock
         self.dropblock_prob = dropblock_prob
+        self.dropblock_block_size = dropblock_block_size
         self.dropout = dropout
         self.dropout_prob = dropout_prob
         # network layers:
@@ -207,12 +210,13 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
         
         if self.dropblock:
-            self.dropblock2d = LinearScheduler(
-                    DropBlock2D(drop_prob=self.dropblock_prob, block_size=3),
-                    start_value=0.0,
-                    stop_value=self.dropblock_prob,
-                    nr_steps=int(25e3)
-                )
+            self.dropblock2d_layer = DropBlock2D(drop_prob=self.dropblock_prob, block_size=2)
+            # self.dropblock2d = LinearScheduler(
+            #         DropBlock2D(drop_prob=self.dropblock_prob, block_size=2),
+            #         start_value=0.0,
+            #         stop_value=self.dropblock_prob,
+            #         nr_steps=int(25e3)
+            #     )
         
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
@@ -286,13 +290,16 @@ class ResNet(nn.Module):
         x = self.maxpool(x)
 
         x1 = self.layer1(x)
+        # ic(x1.shape)
         x2 = self.layer2(x1)
-        x3 = self.layer3(x2)
-        x4 = self.layer4(x3)
-        
+        # ic(x2.shape)
         if self.dropblock:
-            x4 = self.dropblock2d(x4)
-
+            x2 = self.dropblock2d_layer(x2)
+            # ic("x2 drop", x2.shape)
+        x3 = self.layer3(x2)
+        # ic(x3.shape)
+        x4 = self.layer4(x3)
+        # ic(x4.shape)
         x_avgpool = self.avgpool(x4)
         x_flat = torch.flatten(x_avgpool, 1)
 
@@ -483,12 +490,12 @@ def resnet152(input_channels=3,
 
 
 if __name__ == "__main__":
-    # resnet18_model = resnet18()
-    # resnet18_model = resnet18(dropblock=True)
+    sample = torch.randn(1, 3, 32, 32)
     resnet18_model = resnet18(num_classes=10,
                               dropblock=True,
                               dropblock_prob=0.5,
                               dropout=True,
                               dropout_prob=0.3)
-    
-    print(resnet18_model)
+    resnet18_model.eval()
+    # print(resnet18_model)
+    resnet18_model(sample)
