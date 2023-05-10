@@ -20,7 +20,7 @@ class ResnetModule(pl.LightningModule):
                  num_classes: int = 43,
                  dropblock: bool = False,
                  dropblock_prob: float = 0.0,
-                 dropblock_block_size: int = 2,
+                 dropblock_block_size: int = 3,
                  dropout: bool = False,
                  dropout_prob: float = 0.0,
                  loss_fn: str = 'cross_entropy',

@@ -171,7 +171,7 @@ class ResNet(nn.Module):
         norm_layer: Optional[Callable[..., nn.Module]] = None,
         dropblock: bool = False,
         dropblock_prob: float = 0.0,
-        dropblock_block_size: int = 2,
+        dropblock_block_size: int = 3,
         dropout: bool = False,
         dropout_prob: float = 0.0
     ) -> None:
@@ -210,7 +210,8 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
         
         if self.dropblock:
-            self.dropblock2d_layer = DropBlock2D(drop_prob=self.dropblock_prob, block_size=2)
+            self.dropblock2d_layer = DropBlock2D(drop_prob=self.dropblock_prob,
+                                                 block_size=self.dropblock_block_size)
             # self.dropblock2d = LinearScheduler(
             #         DropBlock2D(drop_prob=self.dropblock_prob, block_size=2),
             #         start_value=0.0,
@@ -291,15 +292,20 @@ class ResNet(nn.Module):
 
         x1 = self.layer1(x)
         # ic(x1.shape)
+        
+        if self.dropblock:
+            x1 = self.dropblock2d_layer(x1)
+            # ic("x1 drop", x1.shape)
+        
         x2 = self.layer2(x1)
         # ic(x2.shape)
-        if self.dropblock:
-            x2 = self.dropblock2d_layer(x2)
-            # ic("x2 drop", x2.shape)
+        
         x3 = self.layer3(x2)
         # ic(x3.shape)
+        
         x4 = self.layer4(x3)
         # ic(x4.shape)
+        
         x_avgpool = self.avgpool(x4)
         x_flat = torch.flatten(x_avgpool, 1)
 
@@ -321,6 +327,7 @@ def _resnet(arch_name: str,
             num_classes: int = 1000,  # ImageNet-1000
             dropblock: bool = False,
             dropblock_prob: float = 0.0,
+            dropblock_block_size: int = 3,
             dropout: bool = False,
             dropout_prob: float = 0.0,
             pretrained: bool = False,
@@ -333,6 +340,7 @@ def _resnet(arch_name: str,
                    num_classes=num_classes,
                    dropblock=dropblock,
                    dropblock_prob=dropblock_prob,
+                   dropblock_block_size=dropblock_block_size,
                    dropout=dropout,
                    dropout_prob=dropout_prob,
                    **kwargs)
@@ -347,6 +355,7 @@ def resnet18(input_channels=3,
              num_classes=1000,
              dropblock=False,
              dropblock_prob=0.0,
+             dropblock_block_size=3,
              dropout=False,
              dropout_prob=0.0,
              pretrained=False,
@@ -366,6 +375,7 @@ def resnet18(input_channels=3,
                    num_classes,
                    dropblock,
                    dropblock_prob,
+                   dropblock_block_size,
                    dropout,
                    dropout_prob,
                    pretrained,
@@ -377,6 +387,7 @@ def resnet34(input_channels=3,
              num_classes=1000,
              dropblock=False,
              dropblock_prob=0.0,
+             dropblock_block_size=3,
              dropout=False,
              dropout_prob=0.0,
              pretrained=False,
@@ -395,6 +406,7 @@ def resnet34(input_channels=3,
                    num_classes,
                    dropblock,
                    dropblock_prob,
+                   dropblock_block_size,
                    dropout,
                    dropout_prob,
                    pretrained,
@@ -406,6 +418,7 @@ def resnet50(input_channels=3,
              num_classes=1000,
              dropblock=False,
              dropblock_prob=0.0,
+             dropblock_block_size=3,
              dropout=False,
              dropout_prob=0.0,
              pretrained=False,
@@ -424,6 +437,7 @@ def resnet50(input_channels=3,
                    num_classes,
                    dropblock,
                    dropblock_prob,
+                   dropblock_block_size,
                    dropout,
                    dropout_prob,
                    pretrained,
@@ -435,6 +449,7 @@ def resnet101(input_channels=3,
               num_classes=1000,
               dropblock=False,
               dropblock_prob=0.0,
+              dropblock_block_size=3,
               dropout=False,
               dropout_prob=0.0,
               pretrained=False,
@@ -453,6 +468,7 @@ def resnet101(input_channels=3,
                    num_classes,
                    dropblock,
                    dropblock_prob,
+                   dropblock_block_size,
                    dropout,
                    dropout_prob,
                    pretrained,
@@ -464,6 +480,7 @@ def resnet152(input_channels=3,
               num_classes=1000,
               dropblock=False,
               dropblock_prob=0.0,
+              dropblock_block_size=3,
               dropout=False,
               dropout_prob=0.0,
               pretrained=False,
@@ -482,6 +499,7 @@ def resnet152(input_channels=3,
                    num_classes,
                    dropblock,
                    dropblock_prob,
+                   dropblock_block_size,
                    dropout,
                    dropout_prob,
                    pretrained,
@@ -494,8 +512,11 @@ if __name__ == "__main__":
     resnet18_model = resnet18(num_classes=10,
                               dropblock=True,
                               dropblock_prob=0.5,
+                              dropblock_block_size=3,
                               dropout=True,
                               dropout_prob=0.3)
     resnet18_model.eval()
     # print(resnet18_model)
+    ic(resnet18_model.dropblock2d_layer.drop_prob)
+    ic(resnet18_model.dropblock2d_layer.block_size)
     resnet18_model(sample)
