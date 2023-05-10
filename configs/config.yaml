@@ -14,7 +14,7 @@ defaults:
     # - override hydra/job_logging: colorlog
 
 work_dir: ${hydra:runtime.cwd}
-data_dir: /media/farnez/Data/DATASETS/gtsrb-data/
+data_dir: ${work_dir}/gtsrb-data/
 log_dir: logs_hydra/runs/${logger.mlflow.experiment_name}/${now:%Y-%m-%d_%H-%M-%S}
 
 # use `python main.py debug=true` for easy debugging
