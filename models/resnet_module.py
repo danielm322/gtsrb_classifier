@@ -18,6 +18,7 @@ class ResnetModule(pl.LightningModule):
                  arch_name :str = 'resnet18',
                  input_channels: int = 3,
                  num_classes: int = 43,
+                 spectral_norm: bool = False,
                  dropblock: bool = False,
                  dropblock_prob: float = 0.0,
                  dropblock_block_size: int = 3,
@@ -38,6 +39,7 @@ class ResnetModule(pl.LightningModule):
         self.arch_name = arch_name
         self.input_channels = input_channels
         self.num_classes = num_classes
+        self.spectral_norm = spectral_norm
         self.dropblock = dropblock
         self.dropblock_prob = dropblock_prob
         self.dropblock_block_size = dropblock_block_size
@@ -55,7 +57,8 @@ class ResnetModule(pl.LightningModule):
                               dropblock_prob=self.dropblock_prob,
                               dropblock_block_size=self.dropblock_block_size,
                               dropout=self.dropout,
-                              dropout_prob=self.dropout_prob) 
+                              dropout_prob=self.dropout_prob,
+                              spectral_norm=self.spectral_norm) 
         # add Accuracy Metric
         self.metric_accuracy = torchmetrics.Accuracy(num_classes=self.num_classes)
         

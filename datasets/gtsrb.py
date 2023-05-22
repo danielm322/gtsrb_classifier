@@ -594,8 +594,8 @@ class GtsrbModule(LightningDataModule):
                 [
                     A.Resize(self.img_size[0], self.img_size[1], p=1.0),
                     A.OneOf([
-                             A.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.0),
-                             A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.50, rotate_limit=30),
+                             A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.0),
+                             A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.20, rotate_limit=20),
                     ], p=0.5),
                     A.Normalize(mean=self.norm_mean, std=self.norm_std),
                     ToTensorV2()
@@ -615,10 +615,14 @@ class GtsrbModule(LightningDataModule):
             [
                 A.Resize(self.img_size[0], self.img_size[1], p=1),
                 A.OneOf([
-                    A.MotionBlur(blur_limit=13, always_apply=True, p=1.0),
-                    A.RandomSunFlare(flare_roi=(0.3, 0.1, 0.7, 0.9),
-                                     src_radius=int(self.img_size[1] * 0.6),
-                                     num_flare_circles_lower=10,
+                    # A.MotionBlur(blur_limit=16, p=1.0),
+                    A.RandomFog(fog_coef_lower=0.7,
+                                fog_coef_upper=0.9,
+                                alpha_coef=0.8,
+                                p=1.0),
+                    A.RandomSunFlare(flare_roi=(0.3, 0.3, 0.7, 0.7),
+                                     src_radius=int(self.img_size[1] * 0.8),
+                                     num_flare_circles_lower=8,
                                      num_flare_circles_upper=12,
                                      angle_lower=0.5,
                                      p=1.0),

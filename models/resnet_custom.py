@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from torch.hub import load_state_dict_from_url
 from torch import Tensor
+from torch.nn.utils import spectral_norm
 from dropblock import DropBlock2D, LinearScheduler
 from icecream import ic
 
@@ -97,6 +98,55 @@ class BasicBlock(nn.Module):
         out = self.relu(out)
 
         return out
+    
+    
+class BasicBlockSN(nn.Module):
+    expansion: int = 1
+
+    def __init__(
+        self,
+        inplanes: int,
+        planes: int,
+        stride: int = 1,
+        downsample: Optional[nn.Module] = None,
+        groups: int = 1,
+        base_width: int = 64,
+        dilation: int = 1,
+        norm_layer: Optional[Callable[..., nn.Module]] = None,
+    ) -> None:
+        super().__init__()
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
+        if groups != 1 or base_width != 64:
+            raise ValueError("BasicBlock only supports groups=1 and base_width=64")
+        if dilation > 1:
+            raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
+        # Both self.conv1 and self.downsample layers downsample the input when stride != 1
+        self.conv1 = spectral_norm(conv3x3(inplanes, planes, stride))
+        self.bn1 = norm_layer(planes)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = spectral_norm(conv3x3(planes, planes))
+        self.bn2 = norm_layer(planes)
+        self.downsample = downsample
+        self.stride = stride
+
+    def forward(self, x: Tensor) -> Tensor:
+        identity = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+
+        if self.downsample is not None:
+            identity = self.downsample(x)
+
+        out += identity
+        out = self.relu(out)
+
+        return out
 
 
 class Bottleneck(nn.Module):
@@ -162,7 +212,7 @@ class ResNet(nn.Module):
         self,
         block: Type[Union[BasicBlock, Bottleneck]],
         layers: List[int],
-        input_channels: int  =3,
+        input_channels: int = 3,
         num_classes: int = 1000,
         zero_init_residual: bool = False,
         groups: int = 1,
@@ -292,20 +342,15 @@ class ResNet(nn.Module):
 
         x1 = self.layer1(x)
         # ic(x1.shape)
-        
-        if self.dropblock:
-            x1 = self.dropblock2d_layer(x1)
-            # ic("x1 drop", x1.shape)
-        
         x2 = self.layer2(x1)
         # ic(x2.shape)
-        
+        if self.dropblock:
+            x2 = self.dropblock2d_layer(x2)
+            # ic("x2 drop", x2.shape)
         x3 = self.layer3(x2)
         # ic(x3.shape)
-        
         x4 = self.layer4(x3)
         # ic(x4.shape)
-        
         x_avgpool = self.avgpool(x4)
         x_flat = torch.flatten(x_avgpool, 1)
 
@@ -320,8 +365,39 @@ class ResNet(nn.Module):
         return self._forward_impl(x)
 
 
+class ResNetSN(ResNet): 
+    def __init__(self,
+                 block: Type[Union[BasicBlock, BasicBlockSN, Bottleneck]],
+                 layers: List[int],
+                 input_channels: int = 3,
+                 num_classes: int = 1000,
+                 zero_init_residual: bool = False,
+                 groups: int = 1,
+                 width_per_group: int = 64,
+                 replace_stride_with_dilation: Optional[List[bool]] = None,
+                 norm_layer: Optional[Callable[..., nn.Module]] = None,
+                 dropblock: bool = False,
+                 dropblock_prob: float = 0.0,
+                 dropblock_block_size: int = 3,
+                 dropout: bool = False,
+                 dropout_prob: float = 0.0) -> None:
+        super().__init__(block,
+                         layers,
+                         input_channels,
+                         num_classes,
+                         zero_init_residual,
+                         groups, width_per_group,
+                         replace_stride_with_dilation,
+                         norm_layer,
+                         dropblock,
+                         dropblock_prob,
+                         dropblock_block_size,
+                         dropout,
+                         dropout_prob)
+        
+
 def _resnet(arch_name: str,
-            block: Type[Union[BasicBlock, Bottleneck]],
+            block: Type[Union[BasicBlock, BasicBlockSN, Bottleneck]],
             layers: List[int],
             input_channels: int = 3,
             num_classes: int = 1000,  # ImageNet-1000
@@ -330,20 +406,33 @@ def _resnet(arch_name: str,
             dropblock_block_size: int = 3,
             dropout: bool = False,
             dropout_prob: float = 0.0,
+            spectral_norm: bool = False,
             pretrained: bool = False,
             progress: bool = True,
             **kwargs):
     
-    model = ResNet(block,
-                   layers,
-                   input_channels=input_channels,
-                   num_classes=num_classes,
-                   dropblock=dropblock,
-                   dropblock_prob=dropblock_prob,
-                   dropblock_block_size=dropblock_block_size,
-                   dropout=dropout,
-                   dropout_prob=dropout_prob,
-                   **kwargs)
+    if not spectral_norm:
+        model = ResNet(block,
+                    layers,
+                    input_channels=input_channels,
+                    num_classes=num_classes,
+                    dropblock=dropblock,
+                    dropblock_prob=dropblock_prob,
+                    dropblock_block_size=dropblock_block_size,
+                    dropout=dropout,
+                    dropout_prob=dropout_prob,
+                    **kwargs)
+    else:
+        model = ResNetSN(block,
+                         layers,
+                         input_channels=input_channels,
+                         num_classes=num_classes,
+                         dropblock=dropblock,
+                         dropblock_prob=dropblock_prob,
+                         dropblock_block_size=dropblock_block_size,
+                         dropout=dropout,
+                         dropout_prob=dropout_prob,
+                         **kwargs)
     
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch_name], progress=progress)
@@ -360,6 +449,7 @@ def resnet18(input_channels=3,
              dropout_prob=0.0,
              pretrained=False,
              progress=True,
+             spectral_norm=False,
              **kwargs):
 
     r"""ResNet-18 model from
@@ -369,7 +459,7 @@ def resnet18(input_channels=3,
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _resnet('resnet18',
-                   BasicBlock,
+                   BasicBlockSN if spectral_norm else BasicBlock,
                    [2, 2, 2, 2],
                    input_channels,
                    num_classes,
@@ -378,6 +468,7 @@ def resnet18(input_channels=3,
                    dropblock_block_size,
                    dropout,
                    dropout_prob,
+                   spectral_norm,
                    pretrained,
                    progress,
                    **kwargs)
@@ -508,15 +599,18 @@ def resnet152(input_channels=3,
 
 
 if __name__ == "__main__":
-    sample = torch.randn(1, 3, 32, 32)
+    sample = torch.randn(1, 3, 128, 128)
     resnet18_model = resnet18(num_classes=10,
                               dropblock=True,
-                              dropblock_prob=0.5,
+                              dropblock_prob=0.3,
                               dropblock_block_size=3,
                               dropout=True,
-                              dropout_prob=0.3)
+                              dropout_prob=0.3,
+                              spectral_norm=True)
+    
     resnet18_model.eval()
-    # print(resnet18_model)
+    ic(resnet18_model)
     ic(resnet18_model.dropblock2d_layer.drop_prob)
     ic(resnet18_model.dropblock2d_layer.block_size)
+    ic(sample.shape)
     resnet18_model(sample)

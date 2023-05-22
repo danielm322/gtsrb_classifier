@@ -98,6 +98,7 @@ def main(cfg: DictConfig) -> None:
     model_module = ResnetModule(arch_name=model_type,
                                 input_channels=cfg.model.input_channels,
                                 num_classes=num_classes,
+                                spectral_norm = cfg.model.spectral_norm,
                                 dropblock=cfg.model.drop_block,
                                 dropblock_prob=cfg.model.dropblock_prob,
                                 dropblock_block_size=cfg.model.dropblock_block_size,
