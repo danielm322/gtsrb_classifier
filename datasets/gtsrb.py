@@ -516,6 +516,9 @@ class GtsrbModule(LightningDataModule):
         self.ds_gtsrb_train = None
         self.ds_gtsrb_valid = None
         self.ds_gtsrb_test = None
+        self.ds_gtsrb_train_sampler = None
+        self.ds_gtsrb_valid_sampler = None
+        self.ds_gtsrb_test_sampler = None
         self.custom_transforms = custom_transforms
         self.anomaly_transforms = anomaly_transforms
         self.norm_mean = np.array([0.3337, 0.3064, 0.3171])  # normalization mean
@@ -553,6 +556,7 @@ class GtsrbModule(LightningDataModule):
         train_loader = DataLoader(self.ds_gtsrb_train,
                                   batch_size=self.batch_size,
                                   shuffle=self.shuffle,
+                                  sampler=self.ds_gtsrb_train_sampler,
                                   num_workers=self.num_workers,
                                   pin_memory=self.pin_memory)
 
@@ -563,6 +567,7 @@ class GtsrbModule(LightningDataModule):
         valid_loader = DataLoader(self.ds_gtsrb_valid,
                                   batch_size=self.batch_size,
                                   shuffle=False,
+                                  sampler=self.ds_gtsrb_valid_sampler,
                                   num_workers=self.num_workers,
                                   pin_memory=self.pin_memory)
         
@@ -573,6 +578,7 @@ class GtsrbModule(LightningDataModule):
         test_loader = DataLoader(self.ds_gtsrb_test,
                                  batch_size=self.batch_size,
                                  shuffle=False,
+                                 sampler=self.ds_gtsrb_test_sampler,
                                  num_workers=self.num_workers,
                                  pin_memory=self.pin_memory)
         
