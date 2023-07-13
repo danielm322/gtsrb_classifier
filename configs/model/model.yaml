@@ -2,7 +2,7 @@ model_name: 'resnet18'
 input_channels: 3
 spectral_norm: False
 drop_block: True
-dropblock_prob: 0.3
+dropblock_prob: 0.5
 dropblock_block_size: 4
 dropout: True
 dropout_prob: 0.3
