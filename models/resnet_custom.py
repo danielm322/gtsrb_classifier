@@ -262,6 +262,10 @@ class ResNet(nn.Module):
         if self.dropblock:
             self.dropblock2d_layer = DropBlock2D(drop_prob=self.dropblock_prob,
                                                  block_size=self.dropblock_block_size)
+            # self.dropblock2d_layer_1 = DropBlock2D(drop_prob=0.4,
+            #                                        block_size=10)
+            # self.dropblock2d_layer_2 = DropBlock2D(drop_prob=self.dropblock_prob,
+            #                                        block_size=self.dropblock_block_size)
             # self.dropblock2d = LinearScheduler(
             #         DropBlock2D(drop_prob=self.dropblock_prob, block_size=2),
             #         start_value=0.0,
@@ -342,10 +346,13 @@ class ResNet(nn.Module):
 
         x1 = self.layer1(x)
         # ic(x1.shape)
+        # if self.dropblock:
+        #     x1 = self.dropblock2d_layer_1(x1)
         x2 = self.layer2(x1)
         # ic(x2.shape)
         if self.dropblock:
             x2 = self.dropblock2d_layer(x2)
+            # x2 = self.dropblock2d_layer_2(x2)
             # ic("x2 drop", x2.shape)
         x3 = self.layer3(x2)
         # ic(x3.shape)
