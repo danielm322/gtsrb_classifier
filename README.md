@@ -7,6 +7,9 @@ A pre-processed GTSRB dataset is available in this [Talkspirit link](https://cea
 
 The preprocessed dataset has images of size: (32x32)
 
+## Dataset Shift Detection
+The Dataset shift detection experiments use images of size: (128x128). To this end, the GTSRB datamodule uses image resize in the image transformations. 
+
 ## Requirements
 
 Overview of required deep learning libraries:
