@@ -4,7 +4,7 @@
 defaults:
     # model config
     - trainer: default_trainer.yaml
-    - model: model.yaml
+    - model: model_resnet.yaml
     - datamodule: gtsrb_datamodule.yaml
     - callbacks: default_callbacks.yaml
     - logger: mlflow.yaml

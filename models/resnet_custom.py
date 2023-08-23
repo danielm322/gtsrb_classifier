@@ -402,6 +402,28 @@ class ResNetSN(ResNet):
                          dropout,
                          dropout_prob)
         
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
+        self._norm_layer = norm_layer
+
+        self.inplanes = 64
+        self.dilation = 1
+        
+        if replace_stride_with_dilation is None:
+            # each element in the tuple indicates if we should replace
+            # the 2x2 stride with a dilated convolution instead
+            replace_stride_with_dilation = [False, False, False]
+        if len(replace_stride_with_dilation) != 3:
+            raise ValueError(
+                "replace_stride_with_dilation should be None "
+                f"or a 3-element tuple, got {replace_stride_with_dilation}"
+            )
+        
+        self.layer1 = self._make_layer(BasicBlock, 64, layers[0])
+        self.layer2 = self._make_layer(BasicBlock, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
+        self.layer3 = self._make_layer(BasicBlockSN, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
+        self.layer4 = self._make_layer(BasicBlockSN, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
+        
 
 def _resnet(arch_name: str,
             block: Type[Union[BasicBlock, BasicBlockSN, Bottleneck]],
@@ -609,14 +631,17 @@ if __name__ == "__main__":
     sample = torch.randn(1, 3, 128, 128)
     resnet18_model = resnet18(num_classes=10,
                               dropblock=True,
-                              dropblock_prob=0.3,
-                              dropblock_block_size=3,
+                              dropblock_prob=0.5,
+                              dropblock_block_size=6,
                               dropout=True,
                               dropout_prob=0.3,
                               spectral_norm=True)
     
     resnet18_model.eval()
-    ic(resnet18_model)
+    ic(resnet18_model.layer1)
+    ic(resnet18_model.layer2)
+    ic(resnet18_model.layer3)
+    ic(resnet18_model.layer4)
     ic(resnet18_model.dropblock2d_layer.drop_prob)
     ic(resnet18_model.dropblock2d_layer.block_size)
     ic(sample.shape)
