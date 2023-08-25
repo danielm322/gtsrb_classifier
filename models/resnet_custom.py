@@ -425,7 +425,7 @@ class ResNetSN(ResNet):
         self.layer2 = self._make_layer(BasicBlock, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
         self.layer3 = self._make_layer(BasicBlockSN, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
         self.layer4 = self._make_layer(BasicBlockSN, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
-        
+        self.fc = spectral_norm(nn.Linear(512 * block.expansion, num_classes))
 
 def _resnet(arch_name: str,
             block: Type[Union[BasicBlock, BasicBlockSN, Bottleneck]],
