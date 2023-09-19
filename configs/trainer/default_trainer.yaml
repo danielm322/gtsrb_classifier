@@ -3,7 +3,7 @@
 # Number of devices. If cpu write gpus=1
 gpus: -1
 
-epochs: 20
+epochs: 300
 
 progress_bar_refresh_rate: 10
 

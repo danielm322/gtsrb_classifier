@@ -3,8 +3,8 @@ input_channels: 3
 spectral_norm: False
 drop_block: True
 dropblock_prob: 0.5
-dropblock_block_size: 4
-dropout: True
+dropblock_block_size: 6
+dropout: False
 dropout_prob: 0.3
 lr: 1e-4
 weight_decay: 1e-4

@@ -14,7 +14,7 @@ defaults:
     # - override hydra/job_logging: colorlog
 
 work_dir: ${hydra:runtime.cwd}
-data_dir: /media/farnez/Data/DATASETS/gtsrb-data/
+data_dir: ./gtsrb-data/
 log_dir: logs_hydra/runs/${logger.mlflow.experiment_name}/${now:%Y-%m-%d_%H-%M-%S}
 
 # use `python main.py debug=true` for easy debugging
@@ -23,10 +23,18 @@ log_dir: logs_hydra/runs/${logger.mlflow.experiment_name}/${now:%Y-%m-%d_%H-%M-%
 
 #disable_warnings: True
 rich_progbar: False
-
 slurm: False
-
 seed: 9290
+
+# MCD parameters
+mcd_n_samples: 16
+layer_type: "Conv"
+architecture: "resnet"
+hook_location: 2
+reduction_method: "fullmean"
+original_resnet_architecture: True
+gtsrb_model_path: "./lightning_logs/2023-09-04_09-20-29_vanilla/epoch=206-step=115299.ckpt"  # Daniel
+train_subsamples_size: 0.25  # of the train dataset to perform the OoD detection tasks, not the training
 
 hydra:
     # output paths for hydra logs
