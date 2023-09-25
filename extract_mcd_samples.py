@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import os
 import pandas as pd
 from icecream import ic
 import torch
@@ -177,6 +178,13 @@ def main(cfg: DictConfig) -> None:
     gtsrb_model.to(device);
     gtsrb_model.eval();
     gtsrb_model.apply(resnet18_enable_dropblock2d_test);  # enable dropout
+
+    # Create data folder with the name of the model if it doesn't exist
+    mcd_samples_folder = "./Mcd_samples/"
+    os.makedirs(mcd_samples_folder, exist_ok=True)
+    save_dir = f"{mcd_samples_folder}{cfg.gtsrb_model_path.split('/')[2]}/{cfg.layer_type}"
+    assert not os.path.exists(save_dir), "Folder already exists!"
+    os.mkdir(save_dir)
     ####################################################################################################################
     ####################################################################################################################
     #########################################################################
@@ -201,37 +209,109 @@ def main(cfg: DictConfig) -> None:
         gtsrb_normal_train_loader
     )
     del ind_train_preds
+    torch.save(
+        gtsrb_resnet_gtsrb_normal_train_16mc_samples,
+        f"{save_dir}/gtrsb_train_{gtsrb_resnet_gtsrb_normal_train_16mc_samples.shape[0]}_{gtsrb_resnet_gtsrb_normal_train_16mc_samples.shape[1]}_mcd_samples.pt",
+    )
     # InD valid set
     gtsrb_resnet_gtsrb_normal_valid_16mc_samples, ind_valid_preds = mcd_extractor.get_ls_mcd_samples_baselines(
         gtsrb_normal_valid_loader
+    )
+    torch.save(
+        gtsrb_resnet_gtsrb_normal_valid_16mc_samples,
+        f"{save_dir}/gtrsb_valid_{gtsrb_resnet_gtsrb_normal_valid_16mc_samples.shape[0]}_{gtsrb_resnet_gtsrb_normal_valid_16mc_samples.shape[1]}_mcd_samples.pt",
+    )
+    torch.save(
+        ind_valid_preds,
+        f"{save_dir}/gtrsb_valid_{ind_valid_preds.shape[0]}_{ind_valid_preds.shape[1]}_mcd_preds.pt",
     )
     # InD test set
     gtsrb_resnet_gtsrb_normal_test_16mc_samples, ind_test_preds = mcd_extractor.get_ls_mcd_samples_baselines(
         gtsrb_normal_test_loader
     )
+    torch.save(
+        gtsrb_resnet_gtsrb_normal_test_16mc_samples,
+        f"{save_dir}/gtrsb_test_{gtsrb_resnet_gtsrb_normal_test_16mc_samples.shape[0]}_{gtsrb_resnet_gtsrb_normal_test_16mc_samples.shape[1]}_mcd_samples.pt",
+    )
+    torch.save(
+        ind_test_preds,
+        f"{save_dir}/gtrsb_test_{ind_test_preds.shape[0]}_{ind_test_preds.shape[1]}_mcd_preds.pt",
+    )
     # Anomalies valid set
     gtsrb_resnet_gtsrb_anomal_valid_16mc_samples, anomal_valid_preds = mcd_extractor.get_ls_mcd_samples_baselines(
         gtsrb_anomal_valid_loader
+    )
+    torch.save(
+        gtsrb_resnet_gtsrb_anomal_valid_16mc_samples,
+        f"{save_dir}/gtrsb_anomal_valid_{gtsrb_resnet_gtsrb_anomal_valid_16mc_samples.shape[0]}_{gtsrb_resnet_gtsrb_anomal_valid_16mc_samples.shape[1]}_mcd_samples.pt",
+    )
+    torch.save(
+        anomal_valid_preds,
+        f"{save_dir}/gtrsb_anomal_valid_{anomal_valid_preds.shape[0]}_{anomal_valid_preds.shape[1]}_mcd_preds.pt",
     )
     # Anomalies test set
     gtsrb_resnet_gtsrb_anomal_test_16mc_samples, anomal_test_preds = mcd_extractor.get_ls_mcd_samples_baselines(
         gtsrb_anomal_test_loader
     )
+    torch.save(
+        gtsrb_resnet_gtsrb_anomal_test_16mc_samples,
+        f"{save_dir}/gtrsb_anomal_test_{gtsrb_resnet_gtsrb_anomal_test_16mc_samples.shape[0]}_{gtsrb_resnet_gtsrb_anomal_test_16mc_samples.shape[1]}_mcd_samples.pt",
+    )
+    torch.save(
+        anomal_test_preds,
+        f"{save_dir}/gtrsb_anomal_test_{anomal_test_preds.shape[0]}_{anomal_test_preds.shape[1]}_mcd_preds.pt",
+    )
 
     # Cifar
+    # Valid
     gtsrb_resnet_cifar10_valid_16mc_samples, cifar_valid_preds = mcd_extractor.get_ls_mcd_samples_baselines(
         cifar10_valid_loader
     )
+    torch.save(
+        gtsrb_resnet_cifar10_valid_16mc_samples,
+        f"{save_dir}/cifar_valid_{gtsrb_resnet_cifar10_valid_16mc_samples.shape[0]}_{gtsrb_resnet_cifar10_valid_16mc_samples.shape[1]}_mcd_samples.pt",
+    )
+    torch.save(
+        cifar_valid_preds,
+        f"{save_dir}/cifar_valid_{cifar_valid_preds.shape[0]}_{cifar_valid_preds.shape[1]}_mcd_preds.pt",
+    )
+    # Test
     gtsrb_resnet_cifar10_test_16mc_samples, cifar_test_preds = mcd_extractor.get_ls_mcd_samples_baselines(
         cifar10_test_loader
     )
+    torch.save(
+        gtsrb_resnet_cifar10_test_16mc_samples,
+        f"{save_dir}/cifar_test_{gtsrb_resnet_cifar10_test_16mc_samples.shape[0]}_{gtsrb_resnet_cifar10_test_16mc_samples.shape[1]}_mcd_samples.pt",
+    )
+    torch.save(
+        cifar_test_preds,
+        f"{save_dir}/cifar_test_{cifar_test_preds.shape[0]}_{cifar_test_preds.shape[1]}_mcd_preds.pt",
+    )
 
     # STL
+    # Valid
     gtsrb_resnet_stl10_valid_16mc_samples, stl_valid_preds = mcd_extractor.get_ls_mcd_samples_baselines(
         stl10_valid_loader
     )
+    torch.save(
+        gtsrb_resnet_stl10_valid_16mc_samples,
+        f"{save_dir}/stl_valid_{gtsrb_resnet_stl10_valid_16mc_samples.shape[0]}_{gtsrb_resnet_stl10_valid_16mc_samples.shape[1]}_mcd_samples.pt",
+    )
+    torch.save(
+        stl_valid_preds,
+        f"{save_dir}/stl_valid_{stl_valid_preds.shape[0]}_{stl_valid_preds.shape[1]}_mcd_preds.pt",
+    )
+    # Test
     gtsrb_resnet_stl10_test_16mc_samples, stl_test_preds = mcd_extractor.get_ls_mcd_samples_baselines(
         stl10_test_loader
+    )
+    torch.save(
+        gtsrb_resnet_stl10_test_16mc_samples,
+        f"{save_dir}/stl_test_{gtsrb_resnet_stl10_test_16mc_samples.shape[0]}_{gtsrb_resnet_stl10_test_16mc_samples.shape[1]}_mcd_samples.pt",
+    )
+    torch.save(
+        stl_test_preds,
+        f"{save_dir}/stl_test_{stl_test_preds.shape[0]}_{stl_test_preds.shape[1]}_mcd_preds.pt",
     )
 
     #######################
@@ -254,17 +334,31 @@ def main(cfg: DictConfig) -> None:
                                                      input_dataloader=cifar10_valid_loader)
     ood_stl10_valid_pred_msp_score = get_msp_score(dnn_model=gtsrb_model.model,
                                                    input_dataloader=stl10_valid_loader)
+
     # Concatenate
     ind_gtsrb_pred_msp_score = np.concatenate((ind_gtsrb_valid_pred_msp_score, ind_gtsrb_test_pred_msp_score))
     ood_gtsrb_anomal_pred_msp_score = np.concatenate(
         (ood_gtsrb_anomal_valid_pred_msp_score, ood_gtsrb_anomal_test_pred_msp_score))
     ood_cifar10_pred_msp_score = np.concatenate((ood_cifar10_valid_pred_msp_score, ood_cifar10_test_pred_msp_score))
     ood_stl10_pred_msp_score = np.concatenate((ood_stl10_valid_pred_msp_score, ood_stl10_test_pred_msp_score))
+    np.save(
+        f"{save_dir}/gtsrb_msp", ind_gtsrb_pred_msp_score,
+    )
+    np.save(
+        f"{save_dir}/gtsrb_anomal_msp", ood_gtsrb_anomal_pred_msp_score,
+    )
+    np.save(
+        f"{save_dir}/cifar_msp", ood_cifar10_pred_msp_score,
+    )
+    np.save(
+        f"{save_dir}/stl_msp", ood_stl10_pred_msp_score,
+    )
 
     ##############
     # Get energy scores
     ind_gtsrb_test_pred_energy_score = get_energy_score(dnn_model=gtsrb_model.model,
                                                         input_dataloader=gtsrb_normal_test_loader)
+
     ood_gtsrb_anomal_test_pred_energy_score = get_energy_score(dnn_model=gtsrb_model.model,
                                                                input_dataloader=gtsrb_anomal_test_loader)
     ood_cifar10_test_pred_energy_score = get_energy_score(dnn_model=gtsrb_model.model,
@@ -287,7 +381,18 @@ def main(cfg: DictConfig) -> None:
     ood_cifar10_pred_energy_score = np.concatenate(
         (ood_cifar10_valid_pred_energy_score, ood_cifar10_test_pred_energy_score))
     ood_stl10_pred_energy_score = np.concatenate((ood_stl10_valid_pred_energy_score, ood_stl10_test_pred_energy_score))
-
+    np.save(
+        f"{save_dir}/gtsrb_energy", ind_gtsrb_pred_energy_score,
+    )
+    np.save(
+        f"{save_dir}/gtsrb_anomal_energy", ood_gtsrb_anomal_pred_energy_score,
+    )
+    np.save(
+        f"{save_dir}/cifar_energy", ood_cifar10_pred_energy_score,
+    )
+    np.save(
+        f"{save_dir}/stl_energy", ood_stl10_pred_energy_score,
+    )
     ################
     # Get Mahalanobis distance scores
     gtsrb_model_avgpool_layer_hook = Hook(gtsrb_model.model.avgpool)
@@ -334,7 +439,18 @@ def main(cfg: DictConfig) -> None:
         (ood_gtsrb_anomal_valid_m_dist_score, ood_gtsrb_anomal_test_m_dist_score))
     ood_cifar10_m_dist_score = np.concatenate((ood_cifar10_valid_m_dist_score, ood_cifar10_test_m_dist_score))
     ood_stl10_m_dist_score = np.concatenate((ood_stl10_valid_m_dist_score, ood_stl10_test_m_dist_score))
-
+    np.save(
+        f"{save_dir}/gtsrb_mdist", ind_gtsrb_m_dist_score,
+    )
+    np.save(
+        f"{save_dir}/gtsrb_anomal_mdist", ood_gtsrb_anomal_m_dist_score,
+    )
+    np.save(
+        f"{save_dir}/cifar_mdist", ood_cifar10_m_dist_score,
+    )
+    np.save(
+        f"{save_dir}/stl_mdist", ood_stl10_m_dist_score,
+    )
     ####################
     # KNN detector
     knn_dist_gtsrb = KNNPostprocessor(K=50, setup_flag=False)
@@ -379,7 +495,18 @@ def main(cfg: DictConfig) -> None:
         (ood_gtsrb_anomal_valid_kth_dist_score, ood_gtsrb_anomal_test_kth_dist_score))
     ood_cifar10_kth_dist_score = np.concatenate((ood_cifar10_valid_kth_dist_score, ood_cifar10_test_kth_dist_score))
     ood_stl10_kth_dist_score = np.concatenate((ood_stl10_valid_kth_dist_score, ood_stl10_test_kth_dist_score))
-
+    np.save(
+        f"{save_dir}/gtsrb_knn", ind_gtsrb_kth_dist_score,
+    )
+    np.save(
+        f"{save_dir}/gtsrb_anomal_knn", ood_gtsrb_anomal_kth_dist_score,
+    )
+    np.save(
+        f"{save_dir}/cifar_knn", ood_cifar10_kth_dist_score,
+    )
+    np.save(
+        f"{save_dir}/stl_knn", ood_stl10_kth_dist_score,
+    )
     # Clean memory
     del gtsrb_normal_train_loader
     del gtsrb_normal_valid_loader
@@ -447,325 +574,18 @@ def main(cfg: DictConfig) -> None:
     stl10_h_z = np.concatenate(
         (gtsrb_rn18_h_z_stl10_valid_samples_np, gtsrb_rn18_h_z_stl10_test_samples_np)
     )
-
-    #######################################################################
-    # Setup MLFLow
-    #######################################################################
-    # Setup MLFlow for experiment tracking
-    # MlFlow configuration
-    experiment_name = cfg.logger.mlflow.experiment_name
-    if UPLOAD_FROM_LOCAL_TO_SERVER:
-        mlflow.set_tracking_uri("http://10.8.33.50:5050")
-    elif UPLOAD_FROM_SERVER_TO_SERVER:
-        mlflow.set_tracking_uri("http://127.0.0.1:5051")
-    existing_exp = mlflow.get_experiment_by_name(experiment_name)
-    if not existing_exp:
-        mlflow.create_experiment(
-            name=experiment_name,
-        )
-    experiment = mlflow.set_experiment(experiment_name=experiment_name)
-
-    ############################################################################################################
-    ############################################################################################################
-    ##########################################################################
-    # Start the evaluation run
-    ##########################################################################
-    # Define mlflow run to log metrics and parameters
-    with mlflow.start_run(experiment_id=experiment.experiment_id) as run:
-        # Log parameters with mlflow
-        log_params_from_omegaconf_dict(cfg)
-        ##########################################################################################
-        ########################################################
-        # Evaluate baselines
-        ########################################################
-        ########################
-        # Predictive uncertainty - mutual information
-        # InD set
-        dl_gtsrb_pred_h, dl_gtsrb_mi = get_predictive_uncertainty_score(
-            input_samples=torch.cat((ind_valid_preds, ind_test_preds), dim=0),
-            mcd_nro_samples=cfg.mcd_n_samples
-        )
-        # Anomalies set
-        dl_gtsrb_anomal_pred_h, dl_gtsrb_anomal_mi = get_predictive_uncertainty_score(
-            input_samples=torch.cat((anomal_valid_preds, anomal_test_preds), dim=0),
-            mcd_nro_samples=cfg.mcd_n_samples
-        )
-        # Cifar10
-        dl_cifar10_pred_h, dl_cifar10_mi = get_predictive_uncertainty_score(
-            input_samples=torch.cat((cifar_valid_preds, cifar_test_preds), dim=0),
-            mcd_nro_samples=cfg.mcd_n_samples
-        )
-        # STL10
-        dl_stl10_pred_h, dl_stl10_mi = get_predictive_uncertainty_score(
-            input_samples=torch.cat((stl_valid_preds, stl_test_preds), dim=0),
-            mcd_nro_samples=cfg.mcd_n_samples
-        )
-        # Pass to numpy
-        ind_gtsrb_pred_h_score = dl_gtsrb_pred_h.cpu().numpy()
-        ind_gtsrb_pred_mi_score = dl_gtsrb_mi.cpu().numpy()
-        ood_gtsrb_anomal_pred_h_score = dl_gtsrb_anomal_pred_h.cpu().numpy()
-        ood_gtsrb_anomal_pred_mi_score = dl_gtsrb_anomal_mi.cpu().numpy()
-        ood_cifar10_pred_h_score = dl_cifar10_pred_h.cpu().numpy()
-        ood_cifar10_pred_mi_score = dl_cifar10_mi.cpu().numpy()
-        ood_stl10_pred_h_score = dl_stl10_pred_h.cpu().numpy()
-        ood_stl10_pred_mi_score = dl_stl10_mi.cpu().numpy()
-        # Dictionary that defines experiments names, InD and OoD datasets
-        # We use some negative uncertainty scores to align with the convention that positive
-        # (in-distribution) samples have higher scores (see plots)
-        baselines_experiments = {
-            "anomal pred h": {
-                "InD": -ind_gtsrb_pred_h_score,
-                "OoD": -ood_gtsrb_anomal_pred_h_score
-            },
-            "cifar10 pred h": {
-                "InD": -ind_gtsrb_pred_h_score,
-                "OoD": -ood_cifar10_pred_h_score
-            },
-            "stl10 pred h": {
-                "InD": -ind_gtsrb_pred_h_score,
-                "OoD": -ood_stl10_pred_h_score
-            },
-            "anomal mi": {
-                "InD": -ind_gtsrb_pred_mi_score,
-                "OoD": -ood_gtsrb_anomal_pred_mi_score
-            },
-            "cifar10 mi": {
-                "InD": -ind_gtsrb_pred_mi_score,
-                "OoD": -ood_cifar10_pred_mi_score
-            },
-            "stl10 mi": {
-                "InD": -ind_gtsrb_pred_mi_score,
-                "OoD": -ood_stl10_pred_mi_score
-            },
-            "anomal msp": {
-                "InD": ind_gtsrb_pred_msp_score,
-                "OoD": ood_gtsrb_anomal_pred_msp_score
-            },
-            "cifar10 msp": {
-                "InD": ind_gtsrb_pred_msp_score,
-                "OoD": ood_cifar10_pred_msp_score
-            },
-            "stl10 msp": {
-                "InD": ind_gtsrb_pred_msp_score,
-                "OoD": ood_stl10_pred_msp_score
-            },
-            "anomal energy": {
-                "InD": ind_gtsrb_pred_energy_score,
-                "OoD": ood_gtsrb_anomal_pred_energy_score
-            },
-            "cifar10 energy": {
-                "InD": ind_gtsrb_pred_energy_score,
-                "OoD": ood_cifar10_pred_energy_score
-            },
-            "stl10 energy": {
-                "InD": ind_gtsrb_pred_energy_score,
-                "OoD": ood_stl10_pred_energy_score
-            },
-            "anomal mdist": {
-                "InD": ind_gtsrb_m_dist_score,
-                "OoD": ood_gtsrb_anomal_m_dist_score
-            },
-            "cifar10 mdist": {
-                "InD": ind_gtsrb_m_dist_score,
-                "OoD": ood_cifar10_m_dist_score
-            },
-            "stl10 mdist": {
-                "InD": ind_gtsrb_m_dist_score,
-                "OoD": ood_stl10_m_dist_score
-            },
-            "anomal knn": {
-                "InD": ind_gtsrb_kth_dist_score,
-                "OoD": ood_gtsrb_anomal_kth_dist_score
-            },
-            "stl10 knn": {
-                "InD": ind_gtsrb_kth_dist_score,
-                "OoD": ood_stl10_kth_dist_score
-            },
-            "cifar10 knn": {
-                "InD": ind_gtsrb_kth_dist_score,
-                "OoD": ood_cifar10_kth_dist_score
-            }
-        }
-        baselines_plots = {
-            "Predictive H distribution": {
-                "InD": ind_gtsrb_pred_h_score,
-                "anomal": ood_gtsrb_anomal_pred_h_score,
-                "stl10": ood_stl10_pred_h_score,
-                "cifar10": ood_cifar10_pred_h_score,
-                "x_axis": "Predictive H score",
-                "plot_name": "pred_h"
-            },
-            "Predictive MI distribution": {
-                "InD": ind_gtsrb_pred_mi_score,
-                "anomal": ood_gtsrb_anomal_pred_mi_score,
-                "stl10": ood_stl10_pred_mi_score,
-                "cifar10": ood_cifar10_pred_mi_score,
-                "x_axis": "Predictive MI score",
-                "plot_name": "pred_mi"
-            },
-            "Predictive MSP distribution": {
-                "InD": ind_gtsrb_pred_msp_score,
-                "anomal": ood_gtsrb_anomal_pred_msp_score,
-                "stl10": ood_stl10_pred_msp_score,
-                "cifar10": ood_cifar10_pred_msp_score,
-                "x_axis": "Predictive MSP score",
-                "plot_name": "pred_msp"
-            },
-            "Predictive energy score distribution": {
-                "InD": ind_gtsrb_pred_energy_score,
-                "anomal": ood_gtsrb_anomal_pred_energy_score,
-                "stl10": ood_stl10_pred_energy_score,
-                "cifar10": ood_cifar10_pred_energy_score,
-                "x_axis": "Predictive energy score",
-                "plot_name": "pred_energy"
-            },
-            "Mahalanobis Distance distribution": {
-                "InD": ind_gtsrb_m_dist_score,
-                "anomal": ood_gtsrb_anomal_m_dist_score,
-                "stl10": ood_stl10_m_dist_score,
-                "cifar10": ood_cifar10_m_dist_score,
-                "x_axis": "Mahalanobis Distance score",
-                "plot_name": "pred_mdist"
-            },
-            "kNN distance distribution": {
-                "InD": ind_gtsrb_kth_dist_score,
-                "anomal": ood_gtsrb_anomal_kth_dist_score,
-                "stl10": ood_stl10_kth_dist_score,
-                "cifar10": ood_cifar10_kth_dist_score,
-                "x_axis": "kNN distance score",
-                "plot_name": "pred_knn"
-            }
-        }
-        # Make all plots
-        for plot_title, experiment in baselines_plots.items():
-            # Plot score values predictive entropy
-            pred_score_plot = get_pred_scores_plots_gtsrb(ind_gtsrb_pred_score=experiment["InD"],
-                                                          gtsrb_anomal_pred_score=experiment["anomal"],
-                                                          stl10_pred_score=experiment["stl10"],
-                                                          cifar10_pred_score=experiment["cifar10"],
-                                                          x_axis_name=experiment["x_axis"],
-                                                          title=plot_title)
-            mlflow.log_figure(figure=pred_score_plot.figure,
-                              artifact_file=f"figs/{experiment['plot_name']}.png")
-
-        # Initialize df to store all the results
-        overall_metrics_df = pd.DataFrame(columns=['auroc', 'fpr@95', 'aupr',
-                                                   'fpr', 'tpr', 'roc_thresholds',
-                                                   'precision', 'recall', 'pr_thresholds'])
-        # Log all baselines experiments
-        for experiment_name, experiment in baselines_experiments.items():
-            r_df, r_mlflow = get_hz_detector_results(detect_exp_name=experiment_name,
-                                                     ind_samples_scores=experiment["InD"],
-                                                     ood_samples_scores=experiment["OoD"],
-                                                     return_results_for_mlflow=True)
-            r_mlflow = dict([(f"{experiment_name}_{k}", v) for k, v in r_mlflow.items()])
-            mlflow.log_metrics(r_mlflow)
-            roc_curve = save_roc_ood_detector(
-                results_table=r_df,
-                plot_title=f"ROC gtsrb vs {experiment_name} {cfg.layer_type} layer"
-            )
-            mlflow.log_figure(figure=roc_curve,
-                              artifact_file=f"figs/roc_{experiment_name}.png")
-            overall_metrics_df.append(r_df)
-
-        # Clean memory
-        del baselines_plots
-        del baselines_experiments
-
-        del ind_gtsrb_pred_h_score
-        del ind_gtsrb_pred_mi_score
-        del ood_gtsrb_anomal_pred_h_score
-        del ood_cifar10_pred_h_score
-        del ood_stl10_pred_h_score
-        del ood_gtsrb_anomal_pred_mi_score
-        del ood_cifar10_pred_mi_score
-        del ood_stl10_pred_mi_score
-
-        del ind_gtsrb_pred_msp_score
-        del ood_gtsrb_anomal_pred_msp_score
-        del ood_cifar10_pred_msp_score
-        del ood_stl10_pred_msp_score
-
-        del ind_gtsrb_pred_energy_score
-        del ood_gtsrb_anomal_pred_energy_score
-        del ood_cifar10_pred_energy_score
-        del ood_stl10_pred_energy_score
-
-        del ind_gtsrb_m_dist_score
-        del ood_gtsrb_anomal_m_dist_score
-        del ood_cifar10_m_dist_score
-        del ood_stl10_m_dist_score
-
-        del ind_gtsrb_kth_dist_score
-        del ood_gtsrb_anomal_kth_dist_score
-        del ood_stl10_kth_dist_score
-        del ood_cifar10_kth_dist_score
-
-
-        ######################################################
-        # Evaluate OoD detection method LaRED
-        ######################################################
-        # Build KDE detector
-        gtsrb_ds_shift_detector = DetectorKDE(train_embeddings=gtsrb_rn18_h_z_gtsrb_normal_train_samples_np)
-
-        # Extract Density scores
-        scores_gtsrb = get_hz_scores(gtsrb_ds_shift_detector, gtsrb_h_z)
-        scores_gtsrb_anomal = get_hz_scores(gtsrb_ds_shift_detector, gtsrb_anomal_h_z)
-        scores_cifar10 = get_hz_scores(gtsrb_ds_shift_detector, cifar10_h_z)
-        scores_stl10 = get_hz_scores(gtsrb_ds_shift_detector, stl10_h_z)
-
-        la_red_experiments = {
-            "anomal LaRED": {
-                "InD": scores_gtsrb,
-                "OoD": scores_gtsrb_anomal
-            },
-            "cifar10 LaRED": {
-                "InD": scores_gtsrb,
-                "OoD": scores_cifar10
-            },
-            "stl10 LaRED": {
-                "InD": scores_gtsrb,
-                "OoD": scores_stl10
-            }
-        }
-        # Log Results
-        for experiment_name, experiment in la_red_experiments.items():
-            print("Experiment: gtsrb vs gtsrb-anomal");
-            r_df, r_mlflow = get_hz_detector_results(detect_exp_name=experiment_name,
-                                                     ind_samples_scores=experiment["InD"],
-                                                     ood_samples_scores=experiment["OoD"],
-                                                     return_results_for_mlflow=True)
-            # Add OoD dataset to metrics name
-            r_mlflow = dict([(f"{experiment_name}_{k}", v) for k, v in r_mlflow.items()])
-            mlflow.log_metrics(r_mlflow)
-            # Plot ROC curve
-            roc_curve = save_roc_ood_detector(
-                results_table=r_df,
-                plot_title=f"ROC gtsrb vs {experiment_name} {cfg.layer_type} layer"
-            )
-            # Log the plot with mlflow
-            mlflow.log_figure(figure=roc_curve,
-                              artifact_file=f"figs/roc_{experiment_name}.png")
-            overall_metrics_df.append(r_df)
-        overall_metrics_df_name = f"./results_csvs/{current_date}_experiment.csv"
-        overall_metrics_df.to_csv(path_or_buf=overall_metrics_df_name)
-        mlflow.log_artifact(overall_metrics_df_name)
-
-        # Plots comparison of densities
-        gsc, gga, gc, gs = save_scores_plots(scores_gtsrb,
-                                             scores_gtsrb_anomal,
-                                             scores_stl10,
-                                             scores_cifar10)
-        mlflow.log_figure(figure=gga.figure,
-                          artifact_file="figs/gga.png")
-        mlflow.log_figure(figure=gsc.figure,
-                          artifact_file="figs/gsc.png")
-        mlflow.log_figure(figure=gc.figure,
-                          artifact_file="figs/gc.png")
-        mlflow.log_figure(figure=gs.figure,
-                          artifact_file="figs/gs.png")
-
-        mlflow.end_run()
+    np.save(
+        f"{save_dir}/gtsrb_h_z", gtsrb_h_z,
+    )
+    np.save(
+        f"{save_dir}/gtsrb_anomal_h_z", gtsrb_anomal_h_z,
+    )
+    np.save(
+        f"{save_dir}/cifar_h_z", cifar10_h_z,
+    )
+    np.save(
+        f"{save_dir}/stl_h_z", stl10_h_z,
+    )
 
 
 if __name__ == '__main__':
