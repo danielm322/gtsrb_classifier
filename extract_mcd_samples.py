@@ -1,45 +1,30 @@
 import numpy as np
 import random
 import os
-import pandas as pd
 from icecream import ic
 import torch
 import hydra
-import mlflow
 from torchvision import transforms as transform_lib
 from omegaconf import DictConfig
 from torch.utils.data.sampler import SubsetRandomSampler
 from datasets import GtsrbModule
 from pl_bolts.datamodules import CIFAR10DataModule
 from pl_bolts.datamodules import STL10DataModule
-from helper_functions import log_params_from_omegaconf_dict
 from models import ResnetModule
 from dropblock import DropBlock2D
-from ls_ood_detect_cea.uncertainty_estimation import Hook, MCDSamplesExtractor, get_predictive_uncertainty_score, \
+from ls_ood_detect_cea.uncertainty_estimation import Hook, MCDSamplesExtractor, \
     get_msp_score, get_energy_score, MDSPostprocessor, KNNPostprocessor
 from ls_ood_detect_cea.uncertainty_estimation import get_dl_h_z
-from ls_ood_detect_cea.metrics import get_hz_detector_results, \
-    save_roc_ood_detector, save_scores_plots, get_pred_scores_plots_gtsrb
-from ls_ood_detect_cea.detectors import DetectorKDE
-from ls_ood_detect_cea import get_hz_scores
 
 # Datasets paths
 dataset_path = "./gtsrb-data/"
 cifar10_data_dir = "./ood_datasets/cifar10_data/"
 stl10_data_dir = "./ood_datasets/stl10-data/"
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# If both next two flags are false, mlflow will create a local tracking uri for the experiment
-# Upload analysis to the TDL server
-UPLOAD_FROM_LOCAL_TO_SERVER = True
-# Upload analysis ran on the TDL server
-UPLOAD_FROM_SERVER_TO_SERVER = False
-assert UPLOAD_FROM_SERVER_TO_SERVER + UPLOAD_FROM_LOCAL_TO_SERVER <= 1
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="config.yaml")
 def main(cfg: DictConfig) -> None:
-    # Get date-time to save df later
-    current_date = cfg.log_dir.split("/")[-1]
     ################################################################################################
     #                                 LOAD DATASETS                                   ##############
     ################################################################################################
@@ -575,6 +560,9 @@ def main(cfg: DictConfig) -> None:
         (gtsrb_rn18_h_z_stl10_valid_samples_np, gtsrb_rn18_h_z_stl10_test_samples_np)
     )
     np.save(
+        f"{save_dir}/gtsrb_h_z_train", gtsrb_rn18_h_z_gtsrb_normal_train_samples_np,
+    )
+    np.save(
         f"{save_dir}/gtsrb_h_z", gtsrb_h_z,
     )
     np.save(
@@ -590,21 +578,3 @@ def main(cfg: DictConfig) -> None:
 
 if __name__ == '__main__':
     main()
-
-"""
-Experiment: gtsrb vs gtsrb-anomal
-AUROC: 0.8000
-FPR95: 0.7141
-AUPR: 0.7845
-Test InD shape (4882,)
-Test OoD shape (20000,)
-Experiment: gtsrb vs cifar10
-AUROC: 0.9723
-FPR95: 0.1849
-AUPR: 0.9388
-Test InD shape (4882,)
-Test OoD shape (11000,)
-Experiment: gtsrb vs stl10
-AUROC: 0.9893
-FPR95: 0.0525
-AUPR: 0.9822"""

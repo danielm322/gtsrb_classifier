@@ -33,7 +33,7 @@ architecture: "resnet"
 hook_location: 2
 reduction_method: "fullmean"
 original_resnet_architecture: True
-gtsrb_model_path: "./lightning_logs/2023-09-04_09-20-29_vanilla/epoch=206-step=115299.ckpt"  # Daniel
+gtsrb_model_path: "./lightning_logs/2023-09-04_11-18-38_sn/last.ckpt"  # Daniel
 train_subsamples_size: 0.25  # of the train dataset to perform the OoD detection tasks, not the training
 
 hydra:
