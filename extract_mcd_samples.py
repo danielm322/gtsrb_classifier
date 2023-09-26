@@ -169,7 +169,7 @@ def main(cfg: DictConfig) -> None:
     os.makedirs(mcd_samples_folder, exist_ok=True)
     save_dir = f"{mcd_samples_folder}{cfg.gtsrb_model_path.split('/')[2]}/{cfg.layer_type}"
     assert not os.path.exists(save_dir), "Folder already exists!"
-    os.mkdir(save_dir)
+    os.makedirs(save_dir)
     ####################################################################################################################
     ####################################################################################################################
     #########################################################################
@@ -208,7 +208,7 @@ def main(cfg: DictConfig) -> None:
     )
     torch.save(
         ind_valid_preds,
-        f"{save_dir}/gtrsb_valid_{ind_valid_preds.shape[0]}_{ind_valid_preds.shape[1]}_mcd_preds.pt",
+        f"{save_dir}/gtrsb_valid_mcd_preds.pt",
     )
     # InD test set
     gtsrb_resnet_gtsrb_normal_test_16mc_samples, ind_test_preds = mcd_extractor.get_ls_mcd_samples_baselines(
@@ -220,7 +220,7 @@ def main(cfg: DictConfig) -> None:
     )
     torch.save(
         ind_test_preds,
-        f"{save_dir}/gtrsb_test_{ind_test_preds.shape[0]}_{ind_test_preds.shape[1]}_mcd_preds.pt",
+        f"{save_dir}/gtrsb_test_mcd_preds.pt",
     )
     # Anomalies valid set
     gtsrb_resnet_gtsrb_anomal_valid_16mc_samples, anomal_valid_preds = mcd_extractor.get_ls_mcd_samples_baselines(
@@ -232,7 +232,7 @@ def main(cfg: DictConfig) -> None:
     )
     torch.save(
         anomal_valid_preds,
-        f"{save_dir}/gtrsb_anomal_valid_{anomal_valid_preds.shape[0]}_{anomal_valid_preds.shape[1]}_mcd_preds.pt",
+        f"{save_dir}/gtrsb_anomal_valid_mcd_preds.pt",
     )
     # Anomalies test set
     gtsrb_resnet_gtsrb_anomal_test_16mc_samples, anomal_test_preds = mcd_extractor.get_ls_mcd_samples_baselines(
@@ -244,7 +244,7 @@ def main(cfg: DictConfig) -> None:
     )
     torch.save(
         anomal_test_preds,
-        f"{save_dir}/gtrsb_anomal_test_{anomal_test_preds.shape[0]}_{anomal_test_preds.shape[1]}_mcd_preds.pt",
+        f"{save_dir}/gtrsb_anomal_test_mcd_preds.pt",
     )
 
     # Cifar
@@ -258,7 +258,7 @@ def main(cfg: DictConfig) -> None:
     )
     torch.save(
         cifar_valid_preds,
-        f"{save_dir}/cifar_valid_{cifar_valid_preds.shape[0]}_{cifar_valid_preds.shape[1]}_mcd_preds.pt",
+        f"{save_dir}/cifar_valid_mcd_preds.pt",
     )
     # Test
     gtsrb_resnet_cifar10_test_16mc_samples, cifar_test_preds = mcd_extractor.get_ls_mcd_samples_baselines(
@@ -270,7 +270,7 @@ def main(cfg: DictConfig) -> None:
     )
     torch.save(
         cifar_test_preds,
-        f"{save_dir}/cifar_test_{cifar_test_preds.shape[0]}_{cifar_test_preds.shape[1]}_mcd_preds.pt",
+        f"{save_dir}/cifar_test_mcd_preds.pt",
     )
 
     # STL
@@ -284,7 +284,7 @@ def main(cfg: DictConfig) -> None:
     )
     torch.save(
         stl_valid_preds,
-        f"{save_dir}/stl_valid_{stl_valid_preds.shape[0]}_{stl_valid_preds.shape[1]}_mcd_preds.pt",
+        f"{save_dir}/stl_valid_mcd_preds.pt",
     )
     # Test
     gtsrb_resnet_stl10_test_16mc_samples, stl_test_preds = mcd_extractor.get_ls_mcd_samples_baselines(
@@ -296,7 +296,7 @@ def main(cfg: DictConfig) -> None:
     )
     torch.save(
         stl_test_preds,
-        f"{save_dir}/stl_test_{stl_test_preds.shape[0]}_{stl_test_preds.shape[1]}_mcd_preds.pt",
+        f"{save_dir}/stl_test_mcd_preds.pt",
     )
 
     #######################

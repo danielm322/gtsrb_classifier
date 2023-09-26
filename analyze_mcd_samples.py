@@ -7,7 +7,7 @@ from omegaconf import DictConfig
 from os.path import join as op_join
 from tqdm import tqdm
 from helper_functions import log_params_from_omegaconf_dict
-from ls_ood_detect_cea.uncertainty_estimation import get_predictive_uncertainty_score
+from ls_ood_detect_cea.uncertainty_estimation import get_predictive_uncertainty_score, LaREMPostprocessor
 from ls_ood_detect_cea.metrics import get_hz_detector_results, \
     save_roc_ood_detector, save_scores_plots, get_pred_scores_plots_gtsrb
 from ls_ood_detect_cea.detectors import DetectorKDE
@@ -335,7 +335,20 @@ def main(cfg: DictConfig) -> None:
         scores_cifar10 = get_hz_scores(gtsrb_ds_shift_detector, cifar10_h_z)
         scores_stl10 = get_hz_scores(gtsrb_ds_shift_detector, stl10_h_z)
 
-        la_red_experiments = {
+        ######################################################
+        # Evaluate OoD detection method LaREM
+        ######################################################
+        print("LaREM running...")
+        gtsrb_rn18_larem_detector = LaREMPostprocessor()
+        gtsrb_rn18_larem_detector.setup(gtsrb_rn18_h_z_gtsrb_normal_train_samples_np)
+        ind_gtsrb_larem_score = gtsrb_rn18_larem_detector.postprocess(gtsrb_h_z)
+        ood_gtsrb_anomal_larem_score = gtsrb_rn18_larem_detector.postprocess(gtsrb_anomal_h_z)
+        ood_cifar10_larem_score = gtsrb_rn18_larem_detector.postprocess(cifar10_h_z)
+        ood_stl10_larem_score = gtsrb_rn18_larem_detector.postprocess(stl10_h_z)
+
+        #########################
+        # Log results
+        la_red_la_rem_experiments = {
             "anomal LaRED": {
                 "InD": scores_gtsrb,
                 "OoD": scores_gtsrb_anomal
@@ -347,10 +360,22 @@ def main(cfg: DictConfig) -> None:
             "stl10 LaRED": {
                 "InD": scores_gtsrb,
                 "OoD": scores_stl10
+            },
+            "anomal LaREM": {
+                "InD": ind_gtsrb_larem_score,
+                "OoD": ood_gtsrb_anomal_larem_score
+            },
+            "cifar10 LaREM": {
+                "InD": ind_gtsrb_larem_score,
+                "OoD": ood_cifar10_larem_score
+            },
+            "stl10 LaREM": {
+                "InD": ind_gtsrb_larem_score,
+                "OoD": ood_stl10_larem_score
             }
         }
         # Log Results
-        for experiment_name, experiment in tqdm(la_red_experiments.items(), desc="Logging LaRED"):
+        for experiment_name, experiment in tqdm(la_red_la_rem_experiments.items(), desc="Logging LaRED & LaREM"):
             r_df, r_mlflow = get_hz_detector_results(detect_exp_name=experiment_name,
                                                      ind_samples_scores=experiment["InD"],
                                                      ood_samples_scores=experiment["OoD"],
@@ -367,6 +392,7 @@ def main(cfg: DictConfig) -> None:
             # mlflow.log_figure(figure=roc_curve,
             #                   artifact_file=f"figs/roc_{experiment_name}.png")
             overall_metrics_df = overall_metrics_df.append(r_df)
+
         overall_metrics_df_name = f"./results_csvs/{current_date}_experiment.csv"
         overall_metrics_df.to_csv(path_or_buf=overall_metrics_df_name)
         mlflow.log_artifact(overall_metrics_df_name)
