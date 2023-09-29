@@ -17,9 +17,9 @@ from ls_ood_detect_cea.uncertainty_estimation import Hook, MCDSamplesExtractor, 
 from ls_ood_detect_cea.uncertainty_estimation import get_dl_h_z
 
 # Datasets paths
-dataset_path = "./gtsrb-data/"
-cifar10_data_dir = "./ood_datasets/cifar10_data/"
-stl10_data_dir = "./ood_datasets/stl10-data/"
+dataset_path = "./data/gtsrb-data/"
+cifar10_data_dir = "./data/cifar10_data/"
+stl10_data_dir = "./data/stl10-data/"
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 

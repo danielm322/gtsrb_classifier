@@ -6,7 +6,9 @@ from pytorch_lightning.callbacks import RichProgressBar
 from pytorch_lightning.callbacks.progress.rich_progress import RichProgressBarTheme
 from pytorch_lightning.callbacks import LearningRateMonitor
 from pl_bolts.callbacks import TrainingDataMonitor
+from pl_bolts.datamodules import CIFAR10DataModule
 from pytorch_lightning.plugins.environments import SLURMEnvironment
+from datasets.cifar10 import get_cifar10_input_transformations
 from models import ResnetModule
 from datasets import GtsrbModule
 from icecream import ic
@@ -19,7 +21,8 @@ from datetime import datetime
 
 @hydra.main(version_base=None, config_path="configs/", config_name="config.yaml")
 def main(cfg: DictConfig) -> None:
-
+    assert cfg.ind_dataset in ("gtsrb", "cifar10")
+    assert cfg.ind_dataset in cfg.data_dir
     #####################
     #      Get Args     #
     #####################
@@ -81,16 +84,30 @@ def main(cfg: DictConfig) -> None:
     ###############################
     #      Get Dataset Module     #
     ###############################
-    data_module = GtsrbModule(data_path=dataset_path,
-                              img_size=(cfg.datamodule.image_width, cfg.datamodule.image_height),
-                              batch_size=cfg.datamodule.batch_size,
-                              shuffle=cfg.datamodule.shuffle)
+    if cfg.ind_dataset == "gtsrb":
+        data_module = GtsrbModule(data_path=dataset_path,
+                                  img_size=(cfg.datamodule.image_width, cfg.datamodule.image_height),
+                                  batch_size=cfg.datamodule.batch_size,
+                                  shuffle=cfg.datamodule.shuffle)
 
-    data_module.setup(stage="fit")
-    data_module.setup(stage="validate")
-    data_module.setup(stage="test")
-
-    num_classes = len(data_module.ds_gtsrb_train.classes)
+        data_module.setup(stage="fit")
+        data_module.setup(stage="validate")
+        data_module.setup(stage="test")
+        num_classes = len(data_module.ds_gtsrb_train.classes)
+    # Cifar10
+    else:
+        train_transforms, test_transforms = get_cifar10_input_transformations(
+            cifar10_normalize_inputs=cfg.datamodule.cifar10_normalize_inputs,
+            img_size=cfg.datamodule.image_width,
+            data_augmentations=cfg.datamodule.data_augmentations
+        )
+        data_module = CIFAR10DataModule(data_dir=dataset_path,
+                                        batch_size=cfg.datamodule.batch_size,
+                                        train_transforms=train_transforms,
+                                        test_transforms=test_transforms,
+                                        val_transforms=test_transforms
+                                        )
+        num_classes = data_module.num_classes
     ic(num_classes)
     #############################
     #      Get Model Module     #
