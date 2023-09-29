@@ -153,7 +153,11 @@ def main(cfg: DictConfig) -> None:
     gtsrb_model.eval();
 
     # Add Hooks
-    gtsrb_model_dropblock2d_layer_hook = Hook(gtsrb_model.model.dropblock2d_layer)
+    if cfg.layer_type == "FC":
+        gtsrb_model_dropblock2d_layer_hook = Hook(gtsrb_model.model.dropout_layer)
+    # Conv (dropblock)
+    else:
+        gtsrb_model_dropblock2d_layer_hook = Hook(gtsrb_model.model.dropblock2d_layer)
 
     # Monte Carlo Dropout - Enable Dropout @ Test Time!
     def resnet18_enable_dropblock2d_test(m):
