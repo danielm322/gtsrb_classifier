@@ -86,7 +86,7 @@ def main(cfg: DictConfig) -> None:
     cifar10_dm = CIFAR10DataModule(data_dir=cifar10_data_dir,
                                    val_split=0.2,
                                    num_workers=10,
-                                   normalize=True,
+                                   normalize=False,
                                    batch_size=1,
                                    seed=10,
                                    drop_last=True,

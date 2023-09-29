@@ -35,6 +35,8 @@ reduction_method: "fullmean"
 original_resnet_architecture: True
 gtsrb_model_path: "./lightning_logs/2023-09-04_11-18-38_sn/last.ckpt"  # Daniel
 train_subsamples_size: 0.25  # of the train dataset to perform the OoD detection tasks, not the training
+n_pca_components: [2, 6, 12, 20, 24, 28, 32, 36, 44, 52]
+#n_pca_components: [20, 30, 40]
 
 hydra:
     # output paths for hydra logs

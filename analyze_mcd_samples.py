@@ -7,11 +7,10 @@ from omegaconf import DictConfig
 from os.path import join as op_join
 from tqdm import tqdm
 from helper_functions import log_params_from_omegaconf_dict
-from ls_ood_detect_cea.uncertainty_estimation import get_predictive_uncertainty_score, LaREMPostprocessor
+from ls_ood_detect_cea.uncertainty_estimation import get_predictive_uncertainty_score
 from ls_ood_detect_cea.metrics import get_hz_detector_results, \
-    save_roc_ood_detector, save_scores_plots, get_pred_scores_plots_gtsrb
-from ls_ood_detect_cea.detectors import DetectorKDE
-from ls_ood_detect_cea import get_hz_scores
+    save_roc_ood_detector, save_scores_plots, get_pred_scores_plots_gtsrb, log_evaluate_lared_larem
+from ls_ood_detect_cea import apply_pca_ds_split, apply_pca_transform
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # If both next two flags are false, mlflow will create a local tracking uri for the experiment
@@ -323,99 +322,21 @@ def main(cfg: DictConfig) -> None:
         del ood_cifar10_kth_dist_score
 
         ######################################################
-        # Evaluate OoD detection method LaRED
+        # Evaluate OoD detection method LaRED & LaREM
         ######################################################
-        print("LaRED running...")
-        # Build KDE detector
-        gtsrb_ds_shift_detector = DetectorKDE(train_embeddings=gtsrb_rn18_h_z_gtsrb_normal_train_samples_np)
-
-        # Extract Density scores
-        scores_gtsrb = get_hz_scores(gtsrb_ds_shift_detector, gtsrb_h_z)
-        scores_gtsrb_anomal = get_hz_scores(gtsrb_ds_shift_detector, gtsrb_anomal_h_z)
-        scores_cifar10 = get_hz_scores(gtsrb_ds_shift_detector, cifar10_h_z)
-        scores_stl10 = get_hz_scores(gtsrb_ds_shift_detector, stl10_h_z)
-
-        ######################################################
-        # Evaluate OoD detection method LaREM
-        ######################################################
-        print("LaREM running...")
-        gtsrb_rn18_larem_detector = LaREMPostprocessor()
-        gtsrb_rn18_larem_detector.setup(gtsrb_rn18_h_z_gtsrb_normal_train_samples_np)
-        ind_gtsrb_larem_score = gtsrb_rn18_larem_detector.postprocess(gtsrb_h_z)
-        ood_gtsrb_anomal_larem_score = gtsrb_rn18_larem_detector.postprocess(gtsrb_anomal_h_z)
-        ood_cifar10_larem_score = gtsrb_rn18_larem_detector.postprocess(cifar10_h_z)
-        ood_stl10_larem_score = gtsrb_rn18_larem_detector.postprocess(stl10_h_z)
-
-        #########################
-        # Log results
-        la_red_la_rem_experiments = {
-            "anomal LaRED": {
-                "InD": scores_gtsrb,
-                "OoD": scores_gtsrb_anomal
-            },
-            "cifar10 LaRED": {
-                "InD": scores_gtsrb,
-                "OoD": scores_cifar10
-            },
-            "stl10 LaRED": {
-                "InD": scores_gtsrb,
-                "OoD": scores_stl10
-            },
-            "anomal LaREM": {
-                "InD": ind_gtsrb_larem_score,
-                "OoD": ood_gtsrb_anomal_larem_score
-            },
-            "cifar10 LaREM": {
-                "InD": ind_gtsrb_larem_score,
-                "OoD": ood_cifar10_larem_score
-            },
-            "stl10 LaREM": {
-                "InD": ind_gtsrb_larem_score,
-                "OoD": ood_stl10_larem_score
-            }
-        }
-        # Log Results
-        for experiment_name, experiment in tqdm(la_red_la_rem_experiments.items(), desc="Logging LaRED & LaREM"):
-            r_df, r_mlflow = get_hz_detector_results(detect_exp_name=experiment_name,
-                                                     ind_samples_scores=experiment["InD"],
-                                                     ood_samples_scores=experiment["OoD"],
-                                                     return_results_for_mlflow=True)
-            # Add OoD dataset to metrics name
-            r_mlflow = dict([(f"{experiment_name}_{k}", v) for k, v in r_mlflow.items()])
-            mlflow.log_metrics(r_mlflow)
-            # Plot ROC curve
-            # roc_curve = save_roc_ood_detector(
-            #     results_table=r_df,
-            #     plot_title=f"ROC gtsrb vs {experiment_name} {cfg.layer_type} layer"
-            # )
-            # # Log the plot with mlflow
-            # mlflow.log_figure(figure=roc_curve,
-            #                   artifact_file=f"figs/roc_{experiment_name}.png")
-            overall_metrics_df = overall_metrics_df.append(r_df)
-
-        overall_metrics_df_name = f"./results_csvs/{current_date}_experiment.csv"
-        overall_metrics_df.to_csv(path_or_buf=overall_metrics_df_name)
-        mlflow.log_artifact(overall_metrics_df_name)
-
-        # Plot Roc curves together, by OoD dataset
-        for experiment in ("anomal", "cifar10", "stl10"):
-            temp_df = pd.DataFrame(columns=['auroc', 'fpr@95', 'aupr',
-                                            'fpr', 'tpr', 'roc_thresholds',
-                                            'precision', 'recall', 'pr_thresholds'])
-            for row_name in overall_metrics_df.index:
-                if experiment in row_name:
-                    temp_df = temp_df.append(overall_metrics_df.loc[row_name])
-                    temp_df.rename(index={row_name: row_name.split(experiment)[1]}, inplace=True)
-
-            # Plot ROC curve
-            roc_curve = save_roc_ood_detector(
-                results_table=temp_df,
-                plot_title=f"ROC gtsrb vs {experiment} {cfg.layer_type} layer"
-            )
-            # Log the plot with mlflow
-            mlflow.log_figure(figure=roc_curve,
-                              artifact_file=f"figs/roc_{experiment}.png")
-
+        print("LaRED & LaREM running...")
+        # Perform evaluation with the complete vector of latent representations
+        r_df, scores_gtsrb, scores_gtsrb_anomal, scores_stl10, scores_cifar10 = log_evaluate_lared_larem(
+            ind_train_h_z=gtsrb_rn18_h_z_gtsrb_normal_train_samples_np,
+            ind_test_h_z=gtsrb_h_z,
+            ood_anomal_h_z=gtsrb_anomal_h_z,
+            ood_cifar10_h_z=cifar10_h_z,
+            ood_stl10_h_z=stl10_h_z,
+            experiment_name_extension="",
+            return_density_scores=True
+        )
+        # Add results to df
+        overall_metrics_df = overall_metrics_df.append(r_df)
         # Plots comparison of densities
         gsc, gga, gc, gs = save_scores_plots(scores_gtsrb,
                                              scores_gtsrb_anomal,
@@ -429,6 +350,78 @@ def main(cfg: DictConfig) -> None:
                           artifact_file="figs/gc.png")
         mlflow.log_figure(figure=gs.figure,
                           artifact_file="figs/gs.png")
+
+        # Perform evaluation with PCA reduced vectors
+        for n_components in tqdm(cfg.n_pca_components, desc="Evaluating PCA"):
+            # Perform PCA dimension reduction
+            pca_h_z_ind_train, pca_transformation = apply_pca_ds_split(
+                samples=gtsrb_rn18_h_z_gtsrb_normal_train_samples_np,
+                nro_components=n_components
+            )
+            pca_h_z_ind_test = apply_pca_transform(gtsrb_h_z, pca_transformation)
+            pca_h_z_ood_anomal = apply_pca_transform(gtsrb_anomal_h_z, pca_transformation)
+            pca_h_z_ood_cifar = apply_pca_transform(cifar10_h_z, pca_transformation)
+            pca_h_z_ood_stl = apply_pca_transform(stl10_h_z, pca_transformation)
+            r_df = log_evaluate_lared_larem(
+                ind_train_h_z=pca_h_z_ind_train,
+                ind_test_h_z=pca_h_z_ind_test,
+                ood_anomal_h_z=pca_h_z_ood_anomal,
+                ood_cifar10_h_z=pca_h_z_ood_cifar,
+                ood_stl10_h_z=pca_h_z_ood_stl,
+                experiment_name_extension=f" PCA {n_components}",
+                return_density_scores=False,
+                log_step=n_components
+            )
+            # Add results to df
+            overall_metrics_df = overall_metrics_df.append(r_df)
+
+        overall_metrics_df_name = f"./results_csvs/{current_date}_experiment.csv"
+        overall_metrics_df.to_csv(path_or_buf=overall_metrics_df_name)
+        mlflow.log_artifact(overall_metrics_df_name)
+
+        # Plot Roc curves together, by OoD dataset
+        for experiment in ("anomal", "cifar10", "stl10"):
+            temp_df = pd.DataFrame(columns=['auroc', 'fpr@95', 'aupr',
+                                            'fpr', 'tpr', 'roc_thresholds',
+                                            'precision', 'recall', 'pr_thresholds'])
+            temp_df_pca_lared = pd.DataFrame(columns=['auroc', 'fpr@95', 'aupr',
+                                            'fpr', 'tpr', 'roc_thresholds',
+                                            'precision', 'recall', 'pr_thresholds'])
+            temp_df_pca_larem = pd.DataFrame(columns=['auroc', 'fpr@95', 'aupr',
+                                                      'fpr', 'tpr', 'roc_thresholds',
+                                                      'precision', 'recall', 'pr_thresholds'])
+            for row_name in overall_metrics_df.index:
+                if experiment in row_name and "PCA" not in row_name:
+                    temp_df = temp_df.append(overall_metrics_df.loc[row_name])
+                    temp_df.rename(index={row_name: row_name.split(experiment)[1]}, inplace=True)
+                elif experiment in row_name and "PCA" in row_name and "LaREM" in row_name:
+                    temp_df_pca_larem = temp_df_pca_larem.append(overall_metrics_df.loc[row_name])
+                    temp_df_pca_larem.rename(index={row_name: row_name.split(experiment)[1]}, inplace=True)
+                elif experiment in row_name and "PCA" in row_name and "LaRED" in row_name:
+                    temp_df_pca_lared = temp_df_pca_lared.append(overall_metrics_df.loc[row_name])
+                    temp_df_pca_lared.rename(index={row_name: row_name.split(experiment)[1]}, inplace=True)
+            # Plot ROC curve
+            roc_curve = save_roc_ood_detector(
+                results_table=temp_df,
+                plot_title=f"ROC gtsrb vs {experiment} {cfg.layer_type} layer"
+            )
+            # Log the plot with mlflow
+            mlflow.log_figure(figure=roc_curve,
+                              artifact_file=f"figs/roc_{experiment}.png")
+            roc_curve_pca_larem = save_roc_ood_detector(
+                results_table=temp_df_pca_larem,
+                plot_title=f"ROC gtsrb vs {experiment} LareM PCA {cfg.layer_type} layer"
+            )
+            # Log the plot with mlflow
+            mlflow.log_figure(figure=roc_curve_pca_larem,
+                              artifact_file=f"figs/roc_{experiment}_pca_larem.png")
+            roc_curve_pca_lared = save_roc_ood_detector(
+                results_table=temp_df_pca_lared,
+                plot_title=f"ROC gtsrb vs {experiment} LareD PCA {cfg.layer_type} layer"
+            )
+            # Log the plot with mlflow
+            mlflow.log_figure(figure=roc_curve_pca_lared,
+                              artifact_file=f"figs/roc_{experiment}_pca_lared.png")
 
         mlflow.end_run()
 
