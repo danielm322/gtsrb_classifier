@@ -14,7 +14,7 @@ defaults:
     # - override hydra/job_logging: colorlog
 
 work_dir: ${hydra:runtime.cwd}
-data_dir: ./data/cifar10_data/
+data_dir: ./data/cifar10-data/
 log_dir: logs_hydra/runs/${logger.mlflow.experiment_name}/${now:%Y-%m-%d_%H-%M-%S}
 
 # use `python main.py debug=true` for easy debugging
@@ -28,6 +28,10 @@ seed: 9290
 
 # either gtsrb or cifar10
 ind_dataset: "cifar10"
+# For gtsrb as ind: "anomalies", "stl10", "cifar10"
+# For cifar10 as ind:
+#ood_datasets: ["anomalies", "stl10", "cifar10"]
+ood_datasets: ["anomalies", "gtsrb", "fmnist", "svhn", "places365"]
 
 # MCD parameters
 mcd_n_samples: 16
@@ -39,6 +43,7 @@ original_resnet_architecture: True
 gtsrb_model_path: "./lightning_logs/2023-09-04_09-20-29_vanilla/epoch=206-step=115299.ckpt"  # Daniel
 train_subsamples_size: 0.25  # of the train dataset to perform the OoD detection tasks, not the training
 n_pca_components: [2, 6, 12, 20, 24, 28, 32, 36, 44, 52]
+#n_pca_components: [2, 6, 12, 20, 24, 28, 32, 36, 44, 52, 60, 68, 74]
 #n_pca_components: [20, 30, 40]
 
 hydra:

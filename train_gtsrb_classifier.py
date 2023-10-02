@@ -59,7 +59,7 @@ def main(cfg: DictConfig) -> None:
     #######################################
     #      Training Monitor/Callbacks     #
     #######################################
-    checkpoint_callback = ModelCheckpoint(dirpath='lightning_logs/' + current_date_time,
+    checkpoint_callback = ModelCheckpoint(dirpath=f'lightning_logs/{current_date_time}_ind_{cfg.ind_dataset}',
                                           monitor=cfg.callbacks.model_checkpoint.monitor,
                                           mode=cfg.callbacks.model_checkpoint.mode,
                                           every_n_epochs=cfg.callbacks.model_checkpoint.every_n_epochs,
@@ -99,7 +99,8 @@ def main(cfg: DictConfig) -> None:
         train_transforms, test_transforms = get_cifar10_input_transformations(
             cifar10_normalize_inputs=cfg.datamodule.cifar10_normalize_inputs,
             img_size=cfg.datamodule.image_width,
-            data_augmentations=cfg.datamodule.data_augmentations
+            data_augmentations=cfg.datamodule.data_augmentations,
+            anomalies=False
         )
         data_module = CIFAR10DataModule(data_dir=dataset_path,
                                         batch_size=cfg.datamodule.batch_size,
