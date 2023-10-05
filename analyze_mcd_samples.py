@@ -9,7 +9,7 @@ from tqdm import tqdm
 from helper_functions import log_params_from_omegaconf_dict
 from ls_ood_detect_cea.uncertainty_estimation import get_predictive_uncertainty_score
 from ls_ood_detect_cea.metrics import get_hz_detector_results, \
-    save_roc_ood_detector, save_scores_plots, get_pred_scores_plots_gtsrb, log_evaluate_lared_larem
+    save_roc_ood_detector, save_scores_plots, get_pred_scores_plots, log_evaluate_lared_larem
 from ls_ood_detect_cea import apply_pca_ds_split, apply_pca_transform
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -26,47 +26,64 @@ def main(cfg: DictConfig) -> None:
     # Get date-time to save df later
     current_date = cfg.log_dir.split("/")[-1]
     # Get sampels folder
-    mcd_samples_folder = "./Mcd_samples/"
-    save_dir = f"{mcd_samples_folder}{cfg.gtsrb_model_path.split('/')[2]}/{cfg.layer_type}"
-
+    mcd_samples_folder = f"./Mcd_samples/ind_{cfg.ind_dataset}/"
+    save_dir = f"{mcd_samples_folder}{cfg.model_path.split('/')[2]}/{cfg.layer_type}"
+    all_baselines = ["pred_h", "mi"]
+    all_baselines.extend(cfg.baselines)
     ######################################################################
     # Load all data
     ######################################################################
     # Raw predictions
-    ind_valid_preds = torch.load(f=op_join(save_dir, "gtrsb_valid_mcd_preds.pt"), map_location=device)
-    ind_test_preds = torch.load(f=op_join(save_dir, "gtrsb_test_mcd_preds.pt"), map_location=device)
-    anomal_valid_preds = torch.load(f=op_join(save_dir, "gtrsb_anomal_valid_mcd_preds.pt"), map_location=device)
-    anomal_test_preds = torch.load(f=op_join(save_dir, "gtrsb_anomal_test_mcd_preds.pt"), map_location=device)
-    cifar_valid_preds = torch.load(f=op_join(save_dir, "cifar_valid_mcd_preds.pt"), map_location=device)
-    cifar_test_preds = torch.load(f=op_join(save_dir, "cifar_test_mcd_preds.pt"), map_location=device)
-    stl_valid_preds = torch.load(f=op_join(save_dir, "stl_valid_mcd_preds.pt"), map_location=device)
-    stl_test_preds = torch.load(f=op_join(save_dir, "stl_test_mcd_preds.pt"), map_location=device)
-    # MSP scores
-    ind_gtsrb_pred_msp_score = np.load(file=op_join(save_dir, "gtsrb_msp.npy"))
-    ood_gtsrb_anomal_pred_msp_score = np.load(file=op_join(save_dir, "gtsrb_anomal_msp.npy"))
-    ood_cifar10_pred_msp_score = np.load(file=op_join(save_dir, "cifar_msp.npy"))
-    ood_stl10_pred_msp_score = np.load(file=op_join(save_dir, "stl_msp.npy"))
-    # Energy scores
-    ind_gtsrb_pred_energy_score = np.load(file=op_join(save_dir, "gtsrb_energy.npy"))
-    ood_gtsrb_anomal_pred_energy_score = np.load(file=op_join(save_dir, "gtsrb_anomal_energy.npy"))
-    ood_cifar10_pred_energy_score = np.load(file=op_join(save_dir, "cifar_energy.npy"))
-    ood_stl10_pred_energy_score = np.load(file=op_join(save_dir, "stl_energy.npy"))
-    # Mahalanobis distance scores
-    ind_gtsrb_m_dist_score = np.load(file=op_join(save_dir, "gtsrb_mdist.npy"))
-    ood_gtsrb_anomal_m_dist_score = np.load(file=op_join(save_dir, "gtsrb_anomal_mdist.npy"))
-    ood_cifar10_m_dist_score = np.load(file=op_join(save_dir, "cifar_mdist.npy"))
-    ood_stl10_m_dist_score = np.load(file=op_join(save_dir, "stl_mdist.npy"))
-    # kNN score
-    ind_gtsrb_kth_dist_score = np.load(file=op_join(save_dir, "gtsrb_knn.npy"))
-    ood_gtsrb_anomal_kth_dist_score = np.load(file=op_join(save_dir, "gtsrb_anomal_knn.npy"))
-    ood_cifar10_kth_dist_score = np.load(file=op_join(save_dir, "cifar_knn.npy"))
-    ood_stl10_kth_dist_score = np.load(file=op_join(save_dir, "stl_knn.npy"))
-    # Entropies
-    gtsrb_rn18_h_z_gtsrb_normal_train_samples_np = np.load(file=op_join(save_dir, "gtsrb_h_z_train.npy"))
-    gtsrb_h_z = np.load(file=op_join(save_dir, "gtsrb_h_z.npy"))
-    gtsrb_anomal_h_z = np.load(file=op_join(save_dir, "gtsrb_anomal_h_z.npy"))
-    cifar10_h_z = np.load(file=op_join(save_dir, "cifar_h_z.npy"))
-    stl10_h_z = np.load(file=op_join(save_dir, "stl_h_z.npy"))
+    ind_data_dict = {}
+    ind_data_dict["valid_preds"] = torch.load(
+        f=op_join(save_dir, f"{cfg.ind_dataset}_valid_mcd_preds.pt"),
+        map_location=device
+    )
+    ind_data_dict["test_preds"] = torch.load(
+        f=op_join(save_dir, f"{cfg.ind_dataset}_test_mcd_preds.pt"),
+        map_location=device
+    )
+    # Useful only to calculate the predictive entropy score and the mutual information
+    ood_raw_preds_dict = {}
+    for dataset_name in cfg.ood_datasets:
+        if dataset_name == "anomalies":
+            ood_raw_preds_dict[f"anomalies valid"] = torch.load(
+                f=op_join(save_dir, f"{cfg.ind_dataset}_anomal_valid_mcd_preds.pt"), map_location=device
+            )
+            ood_raw_preds_dict[f"anomalies test"] = torch.load(
+                f=op_join(save_dir, f"{cfg.ind_dataset}_anomal_test_mcd_preds.pt"), map_location=device
+            )
+        else:
+            ood_raw_preds_dict[f"{dataset_name} valid"] = torch.load(
+                f=op_join(save_dir, f"{dataset_name}_valid_mcd_preds.pt"), map_location=device
+            )
+            ood_raw_preds_dict[f"{dataset_name} test"] = torch.load(
+                f=op_join(save_dir, f"{dataset_name}_test_mcd_preds.pt"), map_location=device
+            )
+    # Load all data baselines scores
+    ood_scores_dict = {}
+    for baseline in cfg.baselines:
+        ind_data_dict[baseline] = np.load(file=op_join(save_dir, f"{cfg.ind_dataset}_{baseline}.npy"))
+        for ood_dataset in cfg.ood_datasets:
+            if ood_dataset == "anomalies":
+                ood_scores_dict[f"{ood_dataset} {baseline}"] = np.load(
+                    file=op_join(save_dir, f"{cfg.ind_dataset}_anomal_{baseline}.npy")
+                )
+            else:
+                ood_scores_dict[f"{ood_dataset} {baseline}"] = np.load(
+                    file=op_join(save_dir, f"{ood_dataset}_{baseline}.npy")
+                )
+    # Load InD entropies
+    ind_data_dict["h_z_train"] = np.load(file=op_join(save_dir, f"{cfg.ind_dataset}_h_z_train.npy"))
+    ind_data_dict["h_z"] = np.load(file=op_join(save_dir, f"{cfg.ind_dataset}_h_z.npy"))
+
+    # OoD Entropies
+    ood_entropies_dict = {}
+    for ood_dataset in cfg.ood_datasets:
+        if ood_dataset == "anomalies":
+            ood_entropies_dict[ood_dataset] = np.load(file=op_join(save_dir, f"{cfg.ind_dataset}_anomal_h_z.npy"))
+        else:
+            ood_entropies_dict[ood_dataset] = np.load(file=op_join(save_dir, f"{ood_dataset}_h_z.npy"))
 
     #######################################################################
     # Setup MLFLow
@@ -101,170 +118,59 @@ def main(cfg: DictConfig) -> None:
         ########################
         # Predictive uncertainty - mutual information
         # InD set
-        dl_gtsrb_pred_h, dl_gtsrb_mi = get_predictive_uncertainty_score(
-            input_samples=torch.cat((ind_valid_preds, ind_test_preds), dim=0),
+        ind_data_dict["pred_h"], ind_data_dict["mi"] = get_predictive_uncertainty_score(
+            input_samples=torch.cat((ind_data_dict["valid_preds"], ind_data_dict["test_preds"]), dim=0),
             mcd_nro_samples=cfg.mcd_n_samples
         )
-        # Anomalies set
-        dl_gtsrb_anomal_pred_h, dl_gtsrb_anomal_mi = get_predictive_uncertainty_score(
-            input_samples=torch.cat((anomal_valid_preds, anomal_test_preds), dim=0),
-            mcd_nro_samples=cfg.mcd_n_samples
-        )
-        # Cifar10
-        dl_cifar10_pred_h, dl_cifar10_mi = get_predictive_uncertainty_score(
-            input_samples=torch.cat((cifar_valid_preds, cifar_test_preds), dim=0),
-            mcd_nro_samples=cfg.mcd_n_samples
-        )
-        # STL10
-        dl_stl10_pred_h, dl_stl10_mi = get_predictive_uncertainty_score(
-            input_samples=torch.cat((stl_valid_preds, stl_test_preds), dim=0),
-            mcd_nro_samples=cfg.mcd_n_samples
-        )
-        # Pass to numpy
-        ind_gtsrb_pred_h_score = dl_gtsrb_pred_h.cpu().numpy()
-        ind_gtsrb_pred_mi_score = dl_gtsrb_mi.cpu().numpy()
-        ood_gtsrb_anomal_pred_h_score = dl_gtsrb_anomal_pred_h.cpu().numpy()
-        ood_gtsrb_anomal_pred_mi_score = dl_gtsrb_anomal_mi.cpu().numpy()
-        ood_cifar10_pred_h_score = dl_cifar10_pred_h.cpu().numpy()
-        ood_cifar10_pred_mi_score = dl_cifar10_mi.cpu().numpy()
-        ood_stl10_pred_h_score = dl_stl10_pred_h.cpu().numpy()
-        ood_stl10_pred_mi_score = dl_stl10_mi.cpu().numpy()
+        ind_data_dict["pred_h"], ind_data_dict["mi"] = \
+            ind_data_dict["pred_h"].cpu().numpy(), ind_data_dict["mi"].cpu().numpy()
+        # OoD datasets
+        for ood_dataset in cfg.ood_datasets:
+            ood_scores_dict[f"{ood_dataset} pred_h"], ood_scores_dict[f"{ood_dataset} mi"] = \
+                get_predictive_uncertainty_score(
+                    input_samples=torch.cat((ood_raw_preds_dict[f"{ood_dataset} valid"],
+                                             ood_raw_preds_dict[f"{ood_dataset} test"]), dim=0),
+                    mcd_nro_samples=cfg.mcd_n_samples
+                )
+            ood_scores_dict[f"{ood_dataset} pred_h"], ood_scores_dict[f"{ood_dataset} mi"] = \
+                ood_scores_dict[f"{ood_dataset} pred_h"].cpu().numpy(), ood_scores_dict[
+                    f"{ood_dataset} mi"].cpu().numpy()
+
         # Dictionary that defines experiments names, InD and OoD datasets
         # We use some negative uncertainty scores to align with the convention that positive
         # (in-distribution) samples have higher scores (see plots)
-        baselines_experiments = {
-            "anomal pred h": {
-                "InD": -ind_gtsrb_pred_h_score,
-                "OoD": -ood_gtsrb_anomal_pred_h_score
-            },
-            "cifar10 pred h": {
-                "InD": -ind_gtsrb_pred_h_score,
-                "OoD": -ood_cifar10_pred_h_score
-            },
-            "stl10 pred h": {
-                "InD": -ind_gtsrb_pred_h_score,
-                "OoD": -ood_stl10_pred_h_score
-            },
-            "anomal mi": {
-                "InD": -ind_gtsrb_pred_mi_score,
-                "OoD": -ood_gtsrb_anomal_pred_mi_score
-            },
-            "cifar10 mi": {
-                "InD": -ind_gtsrb_pred_mi_score,
-                "OoD": -ood_cifar10_pred_mi_score
-            },
-            "stl10 mi": {
-                "InD": -ind_gtsrb_pred_mi_score,
-                "OoD": -ood_stl10_pred_mi_score
-            },
-            "anomal msp": {
-                "InD": ind_gtsrb_pred_msp_score,
-                "OoD": ood_gtsrb_anomal_pred_msp_score
-            },
-            "cifar10 msp": {
-                "InD": ind_gtsrb_pred_msp_score,
-                "OoD": ood_cifar10_pred_msp_score
-            },
-            "stl10 msp": {
-                "InD": ind_gtsrb_pred_msp_score,
-                "OoD": ood_stl10_pred_msp_score
-            },
-            "anomal energy": {
-                "InD": ind_gtsrb_pred_energy_score,
-                "OoD": ood_gtsrb_anomal_pred_energy_score
-            },
-            "cifar10 energy": {
-                "InD": ind_gtsrb_pred_energy_score,
-                "OoD": ood_cifar10_pred_energy_score
-            },
-            "stl10 energy": {
-                "InD": ind_gtsrb_pred_energy_score,
-                "OoD": ood_stl10_pred_energy_score
-            },
-            "anomal mdist": {
-                "InD": ind_gtsrb_m_dist_score,
-                "OoD": ood_gtsrb_anomal_m_dist_score
-            },
-            "cifar10 mdist": {
-                "InD": ind_gtsrb_m_dist_score,
-                "OoD": ood_cifar10_m_dist_score
-            },
-            "stl10 mdist": {
-                "InD": ind_gtsrb_m_dist_score,
-                "OoD": ood_stl10_m_dist_score
-            },
-            "anomal knn": {
-                "InD": ind_gtsrb_kth_dist_score,
-                "OoD": ood_gtsrb_anomal_kth_dist_score
-            },
-            "stl10 knn": {
-                "InD": ind_gtsrb_kth_dist_score,
-                "OoD": ood_stl10_kth_dist_score
-            },
-            "cifar10 knn": {
-                "InD": ind_gtsrb_kth_dist_score,
-                "OoD": ood_cifar10_kth_dist_score
-            }
-        }
-        baselines_plots = {
-            "Predictive H distribution": {
-                "InD": ind_gtsrb_pred_h_score,
-                "anomal": ood_gtsrb_anomal_pred_h_score,
-                "stl10": ood_stl10_pred_h_score,
-                "cifar10": ood_cifar10_pred_h_score,
-                "x_axis": "Predictive H score",
-                "plot_name": "pred_h"
-            },
-            "Predictive MI distribution": {
-                "InD": ind_gtsrb_pred_mi_score,
-                "anomal": ood_gtsrb_anomal_pred_mi_score,
-                "stl10": ood_stl10_pred_mi_score,
-                "cifar10": ood_cifar10_pred_mi_score,
-                "x_axis": "Predictive MI score",
-                "plot_name": "pred_mi"
-            },
-            "Predictive MSP distribution": {
-                "InD": ind_gtsrb_pred_msp_score,
-                "anomal": ood_gtsrb_anomal_pred_msp_score,
-                "stl10": ood_stl10_pred_msp_score,
-                "cifar10": ood_cifar10_pred_msp_score,
-                "x_axis": "Predictive MSP score",
-                "plot_name": "pred_msp"
-            },
-            "Predictive energy score distribution": {
-                "InD": ind_gtsrb_pred_energy_score,
-                "anomal": ood_gtsrb_anomal_pred_energy_score,
-                "stl10": ood_stl10_pred_energy_score,
-                "cifar10": ood_cifar10_pred_energy_score,
-                "x_axis": "Predictive energy score",
-                "plot_name": "pred_energy"
-            },
-            "Mahalanobis Distance distribution": {
-                "InD": ind_gtsrb_m_dist_score,
-                "anomal": ood_gtsrb_anomal_m_dist_score,
-                "stl10": ood_stl10_m_dist_score,
-                "cifar10": ood_cifar10_m_dist_score,
-                "x_axis": "Mahalanobis Distance score",
-                "plot_name": "pred_mdist"
-            },
-            "kNN distance distribution": {
-                "InD": ind_gtsrb_kth_dist_score,
-                "anomal": ood_gtsrb_anomal_kth_dist_score,
-                "stl10": ood_stl10_kth_dist_score,
-                "cifar10": ood_cifar10_kth_dist_score,
-                "x_axis": "kNN distance score",
-                "plot_name": "pred_knn"
-            }
-        }
+        baselines_experiments = {}
+        for baseline in all_baselines:
+            for ood_dataset in cfg.ood_datasets:
+                if baseline == "pred_h" or baseline == "mi":
+                    baselines_experiments[f"{ood_dataset} {baseline}"] = {
+                        "InD": -ind_data_dict[baseline],
+                        "OoD": -ood_scores_dict[f"{ood_dataset} {baseline}"]
+                    }
+                else:
+                    baselines_experiments[f"{ood_dataset} {baseline}"] = {
+                        "InD": ind_data_dict[baseline],
+                        "OoD": ood_scores_dict[f"{ood_dataset} {baseline}"]
+                    }
+
+        baselines_plots = {}
+        for baseline in all_baselines:
+            baselines_plots[baseline_name_dict[baseline]["plot_title"]] = {"InD": ind_data_dict[baseline]}
+            baselines_plots[baseline_name_dict[baseline]["plot_title"]]["x_axis"] = \
+                baseline_name_dict[baseline]["x_axis"]
+            baselines_plots[baseline_name_dict[baseline]["plot_title"]]["plot_name"] = \
+                baseline_name_dict[baseline]["plot_name"]
+            for ood_dataset in cfg.ood_datasets:
+                baselines_plots[baseline_name_dict[baseline]["plot_title"]][ood_dataset] = \
+                    ood_scores_dict[f"{ood_dataset} {baseline}"]
+
         # Make all baselines plots
         for plot_title, experiment in tqdm(baselines_plots.items(), desc="Plotting baselines"):
             # Plot score values predictive entropy
-            pred_score_plot = get_pred_scores_plots_gtsrb(ind_gtsrb_pred_score=experiment["InD"],
-                                                          gtsrb_anomal_pred_score=experiment["anomal"],
-                                                          stl10_pred_score=experiment["stl10"],
-                                                          cifar10_pred_score=experiment["cifar10"],
-                                                          x_axis_name=experiment["x_axis"],
-                                                          title=plot_title)
+            pred_score_plot = get_pred_scores_plots(experiment,
+                                                    cfg.ood_datasets,
+                                                    title=plot_title,
+                                                    ind_dataset_name=cfg.ind_dataset)
             mlflow.log_figure(figure=pred_score_plot.figure,
                               artifact_file=f"figs/{experiment['plot_name']}.png")
 
@@ -280,94 +186,61 @@ def main(cfg: DictConfig) -> None:
                                                      return_results_for_mlflow=True)
             r_mlflow = dict([(f"{experiment_name}_{k}", v) for k, v in r_mlflow.items()])
             mlflow.log_metrics(r_mlflow)
+            # Plot each ROC curve individually LEAVE COMMENTED
             # roc_curve = save_roc_ood_detector(
             #     results_table=r_df,
-            #     plot_title=f"ROC gtsrb vs {experiment_name} {cfg.layer_type} layer"
+            #     plot_title=f"ROC {cfg.ind_dataset} vs {experiment_name} {cfg.layer_type} layer"
             # )
             # mlflow.log_figure(figure=roc_curve,
             #                   artifact_file=f"figs/roc_{experiment_name}.png")
+            # END COMMENTED SECTION
             overall_metrics_df = overall_metrics_df.append(r_df)
 
         # Clean memory
         del baselines_plots
         del baselines_experiments
-
-        del ind_gtsrb_pred_h_score
-        del ind_gtsrb_pred_mi_score
-        del ood_gtsrb_anomal_pred_h_score
-        del ood_cifar10_pred_h_score
-        del ood_stl10_pred_h_score
-        del ood_gtsrb_anomal_pred_mi_score
-        del ood_cifar10_pred_mi_score
-        del ood_stl10_pred_mi_score
-
-        del ind_gtsrb_pred_msp_score
-        del ood_gtsrb_anomal_pred_msp_score
-        del ood_cifar10_pred_msp_score
-        del ood_stl10_pred_msp_score
-
-        del ind_gtsrb_pred_energy_score
-        del ood_gtsrb_anomal_pred_energy_score
-        del ood_cifar10_pred_energy_score
-        del ood_stl10_pred_energy_score
-
-        del ind_gtsrb_m_dist_score
-        del ood_gtsrb_anomal_m_dist_score
-        del ood_cifar10_m_dist_score
-        del ood_stl10_m_dist_score
-
-        del ind_gtsrb_kth_dist_score
-        del ood_gtsrb_anomal_kth_dist_score
-        del ood_stl10_kth_dist_score
-        del ood_cifar10_kth_dist_score
+        del ood_scores_dict
+        del ood_raw_preds_dict
 
         ######################################################
         # Evaluate OoD detection method LaRED & LaREM
         ######################################################
         print("LaRED & LaREM running...")
         # Perform evaluation with the complete vector of latent representations
-        r_df, scores_gtsrb, scores_gtsrb_anomal, scores_stl10, scores_cifar10 = log_evaluate_lared_larem(
-            ind_train_h_z=gtsrb_rn18_h_z_gtsrb_normal_train_samples_np,
-            ind_test_h_z=gtsrb_h_z,
-            ood_anomal_h_z=gtsrb_anomal_h_z,
-            ood_cifar10_h_z=cifar10_h_z,
-            ood_stl10_h_z=stl10_h_z,
+        r_df, ind_lared_scores, ood_lared_scores_dict = log_evaluate_lared_larem(
+            ind_train_h_z=ind_data_dict["h_z_train"],
+            ind_test_h_z=ind_data_dict["h_z"],
+            ood_h_z_dict=ood_entropies_dict,
             experiment_name_extension="",
             return_density_scores=True
         )
         # Add results to df
         overall_metrics_df = overall_metrics_df.append(r_df)
         # Plots comparison of densities
-        gsc, gga, gc, gs = save_scores_plots(scores_gtsrb,
-                                             scores_gtsrb_anomal,
-                                             scores_stl10,
-                                             scores_cifar10)
-        mlflow.log_figure(figure=gga.figure,
-                          artifact_file="figs/gga.png")
-        mlflow.log_figure(figure=gsc.figure,
-                          artifact_file="figs/gsc.png")
-        mlflow.log_figure(figure=gc.figure,
-                          artifact_file="figs/gc.png")
-        mlflow.log_figure(figure=gs.figure,
-                          artifact_file="figs/gs.png")
+        lared_scores_plots_dict = save_scores_plots(ind_lared_scores,
+                                                    ood_lared_scores_dict,
+                                                    cfg.ood_datasets,
+                                                    cfg.ind_dataset)
+        for plot_name, plot in lared_scores_plots_dict.items():
+            mlflow.log_figure(figure=plot.figure,
+                              artifact_file=f"figs/{plot_name}.png")
 
         # Perform evaluation with PCA reduced vectors
         for n_components in tqdm(cfg.n_pca_components, desc="Evaluating PCA"):
             # Perform PCA dimension reduction
             pca_h_z_ind_train, pca_transformation = apply_pca_ds_split(
-                samples=gtsrb_rn18_h_z_gtsrb_normal_train_samples_np,
+                samples=ind_data_dict["h_z_train"],
                 nro_components=n_components
             )
-            pca_h_z_ind_test = apply_pca_transform(gtsrb_h_z, pca_transformation)
-            pca_h_z_ood_anomal = apply_pca_transform(gtsrb_anomal_h_z, pca_transformation)
-            pca_h_z_ood_cifar = apply_pca_transform(cifar10_h_z, pca_transformation)
-            pca_h_z_ood_stl = apply_pca_transform(stl10_h_z, pca_transformation)
+            pca_h_z_ind_test = apply_pca_transform(ind_data_dict["h_z"], pca_transformation)
+            ood_pca_dict = {}
+            for ood_dataset in cfg.ood_datasets:
+                ood_pca_dict[ood_dataset] = apply_pca_transform(ood_entropies_dict[ood_dataset], pca_transformation)
+
             r_df = log_evaluate_lared_larem(
                 ind_train_h_z=pca_h_z_ind_train,
                 ind_test_h_z=pca_h_z_ind_test,
-                ood_anomal_h_z=pca_h_z_ood_anomal,
-                ood_cifar10_h_z=pca_h_z_ood_cifar,
-                ood_stl10_h_z=pca_h_z_ood_stl,
+                ood_h_z_dict=ood_pca_dict,
                 experiment_name_extension=f" PCA {n_components}",
                 return_density_scores=False,
                 log_step=n_components
@@ -380,51 +253,84 @@ def main(cfg: DictConfig) -> None:
         mlflow.log_artifact(overall_metrics_df_name)
 
         # Plot Roc curves together, by OoD dataset
-        for experiment in ("anomal", "cifar10", "stl10"):
+        for ood_dataset in cfg.ood_datasets:
             temp_df = pd.DataFrame(columns=['auroc', 'fpr@95', 'aupr',
                                             'fpr', 'tpr', 'roc_thresholds',
                                             'precision', 'recall', 'pr_thresholds'])
             temp_df_pca_lared = pd.DataFrame(columns=['auroc', 'fpr@95', 'aupr',
-                                            'fpr', 'tpr', 'roc_thresholds',
-                                            'precision', 'recall', 'pr_thresholds'])
+                                                      'fpr', 'tpr', 'roc_thresholds',
+                                                      'precision', 'recall', 'pr_thresholds'])
             temp_df_pca_larem = pd.DataFrame(columns=['auroc', 'fpr@95', 'aupr',
                                                       'fpr', 'tpr', 'roc_thresholds',
                                                       'precision', 'recall', 'pr_thresholds'])
             for row_name in overall_metrics_df.index:
-                if experiment in row_name and "PCA" not in row_name:
+                if ood_dataset in row_name and "PCA" not in row_name:
                     temp_df = temp_df.append(overall_metrics_df.loc[row_name])
-                    temp_df.rename(index={row_name: row_name.split(experiment)[1]}, inplace=True)
-                elif experiment in row_name and "PCA" in row_name and "LaREM" in row_name:
+                    temp_df.rename(index={row_name: row_name.split(ood_dataset)[1]}, inplace=True)
+                elif ood_dataset in row_name and "PCA" in row_name and "LaREM" in row_name:
                     temp_df_pca_larem = temp_df_pca_larem.append(overall_metrics_df.loc[row_name])
-                    temp_df_pca_larem.rename(index={row_name: row_name.split(experiment)[1]}, inplace=True)
-                elif experiment in row_name and "PCA" in row_name and "LaRED" in row_name:
+                    temp_df_pca_larem.rename(index={row_name: row_name.split(ood_dataset)[1]}, inplace=True)
+                elif ood_dataset in row_name and "PCA" in row_name and "LaRED" in row_name:
                     temp_df_pca_lared = temp_df_pca_lared.append(overall_metrics_df.loc[row_name])
-                    temp_df_pca_lared.rename(index={row_name: row_name.split(experiment)[1]}, inplace=True)
+                    temp_df_pca_lared.rename(index={row_name: row_name.split(ood_dataset)[1]}, inplace=True)
             # Plot ROC curve
             roc_curve = save_roc_ood_detector(
                 results_table=temp_df,
-                plot_title=f"ROC gtsrb vs {experiment} {cfg.layer_type} layer"
+                plot_title=f"ROC {cfg.ind_dataset} vs {ood_dataset} {cfg.layer_type} layer"
             )
             # Log the plot with mlflow
             mlflow.log_figure(figure=roc_curve,
-                              artifact_file=f"figs/roc_{experiment}.png")
+                              artifact_file=f"figs/roc_{ood_dataset}.png")
             roc_curve_pca_larem = save_roc_ood_detector(
                 results_table=temp_df_pca_larem,
-                plot_title=f"ROC gtsrb vs {experiment} LareM PCA {cfg.layer_type} layer"
+                plot_title=f"ROC {cfg.ind_dataset} vs {ood_dataset} LareM PCA {cfg.layer_type} layer"
             )
             # Log the plot with mlflow
             mlflow.log_figure(figure=roc_curve_pca_larem,
-                              artifact_file=f"figs/roc_{experiment}_pca_larem.png")
+                              artifact_file=f"figs/roc_{ood_dataset}_pca_larem.png")
             roc_curve_pca_lared = save_roc_ood_detector(
                 results_table=temp_df_pca_lared,
-                plot_title=f"ROC gtsrb vs {experiment} LareD PCA {cfg.layer_type} layer"
+                plot_title=f"ROC {cfg.ind_dataset} vs {ood_dataset} LareD PCA {cfg.layer_type} layer"
             )
             # Log the plot with mlflow
             mlflow.log_figure(figure=roc_curve_pca_lared,
-                              artifact_file=f"figs/roc_{experiment}_pca_lared.png")
+                              artifact_file=f"figs/roc_{ood_dataset}_pca_lared.png")
 
         mlflow.end_run()
 
+
+baseline_name_dict = {
+    "pred_h": {
+        "plot_title": "Predictive H distribution",
+        "x_axis": "Predictive H score",
+        "plot_name": "pred_h"
+    },
+    "mi": {
+        "plot_title": "Predictive MI distribution",
+        "x_axis": "Predictive MI score",
+        "plot_name": "pred_mi"
+    },
+    "msp": {
+        "plot_title": "Predictive MSP distribution",
+        "x_axis": "Predictive MSP score",
+        "plot_name": "pred_msp"
+    },
+    "energy": {
+        "plot_title": "Predictive energy score distribution",
+        "x_axis": "Predictive energy score",
+        "plot_name": "pred_energy"
+    },
+    "mdist": {
+        "plot_title": "Mahalanobis Distance distribution",
+        "x_axis": "Mahalanobis Distance score",
+        "plot_name": "pred_mdist"
+    },
+    "knn": {
+        "plot_title": "kNN distance distribution",
+        "x_axis": "kNN Distance score",
+        "plot_name": "pred_knn"
+    }
+}
 
 if __name__ == '__main__':
     main()
