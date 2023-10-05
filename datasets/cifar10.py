@@ -1,8 +1,26 @@
+import numpy as np
 import torch
 import torchvision
 from pl_bolts.transforms.dataset_normalizations import cifar10_normalization
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
+
+
+# Helper class to enable albumentations transformations
+class Transforms:
+    """
+    Transforms (dummy) Class to Apply Albumanetations transforms to
+    PyTorch ImageFolder dataset class\n
+    See:
+        https://albumentations.ai/docs/examples/example/
+        https://stackoverflow.com/questions/69151052/using-imagefolder-with-albumentations-in-pytorch
+        https://github.com/albumentations-team/albumentations/issues/1010
+    """
+    def __init__(self, transforms: A.Compose):
+        self.transforms = transforms
+
+    def __call__(self, img, *args, **kwargs):
+        return self.transforms(image=np.array(img))["image"]
 
 
 def get_cifar10_input_transformations(cifar10_normalize_inputs: bool,
@@ -30,8 +48,8 @@ def get_cifar10_input_transformations(cifar10_normalize_inputs: bool,
                         ]),
                         p=0.2
                     ),
-                    cifar10_normalization(),
                     torchvision.transforms.ToTensor(),
+                    cifar10_normalization(),
                 ]
             )
         elif data_augmentations == 'basic':
@@ -40,23 +58,23 @@ def get_cifar10_input_transformations(cifar10_normalize_inputs: bool,
                     torchvision.transforms.Resize(size=(img_size, img_size)),
                     torchvision.transforms.RandomCrop(img_size, padding=int(img_size / 8)),
                     torchvision.transforms.RandomHorizontalFlip(),
-                    cifar10_normalization(),
                     torchvision.transforms.ToTensor(),
+                    cifar10_normalization(),
                 ]
             )
         else:
             train_transforms = torchvision.transforms.Compose(
                 [
                     torchvision.transforms.Resize(size=(img_size, img_size)),
-                    cifar10_normalization(),
                     torchvision.transforms.ToTensor(),
+                    cifar10_normalization(),
                 ]
             )
         test_transforms = torchvision.transforms.Compose(
             [
                 torchvision.transforms.Resize(size=(img_size, img_size)),
-                cifar10_normalization(),
                 torchvision.transforms.ToTensor(),
+                cifar10_normalization(),
             ]
         )
         if anomalies:
@@ -80,11 +98,11 @@ def get_cifar10_input_transformations(cifar10_normalize_inputs: bool,
                                      snow_point_upper=0.8,
                                      p=1.0)
                     ], p=1.0),
-                    cifar10_normalization(),
+                    A.Normalize(mean=np.array([125.3, 123.0, 113.9]), std=np.array([63.0, 62.1, 66.7])),
                     ToTensorV2()
                 ]
             )
-            return anomaly_transforms, anomaly_transforms
+            return Transforms(anomaly_transforms), Transforms(anomaly_transforms)
     # No cifar10 normalization
     else:
         if data_augmentations == 'extra':
@@ -156,6 +174,22 @@ def get_cifar10_input_transformations(cifar10_normalize_inputs: bool,
                     ToTensorV2()
                 ]
             )
-            return anomaly_transforms, anomaly_transforms
+            return Transforms(anomaly_transforms), Transforms(anomaly_transforms)
 
     return train_transforms, test_transforms
+
+
+def fmnist_to_cifar_format(img_size: int, cifar_normalize: bool):
+    if cifar_normalize:
+        return torchvision.transforms.Compose([
+            torchvision.transforms.Resize(size=(img_size, img_size)),
+            torchvision.transforms.Grayscale(num_output_channels=3),
+            torchvision.transforms.ToTensor(),
+            cifar10_normalization(),
+        ])
+    else:
+        return torchvision.transforms.Compose([
+            torchvision.transforms.Resize(size=(img_size, img_size)),
+            torchvision.transforms.Grayscale(num_output_channels=3),
+            torchvision.transforms.ToTensor(),
+        ])
