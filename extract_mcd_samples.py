@@ -25,12 +25,16 @@ cifar10_data_dir = "./data/cifar10-data/"
 stl10_data_dir = "./data/stl10-data/"
 fmnist_data_dir = "./data/fmnist-data"
 svhn_data_dir = './data/svhn-data/'
+places_data_dir = "./data/places-data"
+textures_data_dir = "./data/textures-data"
+lsun_data_dir = "./data/lsun-data"
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 N_WORKERS = os.cpu_count() - 4 if os.cpu_count() >= 8 else os.cpu_count() - 2
 CIFAR10_TEST_SIZE = 0.5  # From test size 10000 default:0.5
 FMNIST_TEST_SIZE = 0.5  # From test size 10000 default:0.5
 SVHN_TEST_SIZE = 0.2  # From test size 26000 default:0.2
-EXTRACT_MCD_SAMPLES_AND_ENTROPIES = False  # set False for debugging purposes
+PLACES_TEST_SIZE = 0.2  # From test size 36500 default:0.14
+EXTRACT_MCD_SAMPLES_AND_ENTROPIES = True  # set False for debugging purposes
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="config.yaml")
@@ -152,6 +156,8 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
             torch.Generator().manual_seed(cfg.seed)
         )[0]
         # Subset the test dataset
+        # Here, for several datasets a double split is needed since the script extracts by default from a
+        # validation and test set
         cifar10_test_subset = torch.utils.data.random_split(
             cifar10_dm.dataset_test,
             [int(len(cifar10_dm.dataset_test) * CIFAR10_TEST_SIZE),
@@ -343,6 +349,58 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
             "test": DataLoader(svhn_test, batch_size=1, shuffle=True)
         }
         del svhn_init_valid
+    ##########################################################
+    # Places 365 OoD
+    ##########################################################
+    if "places" in cfg.ood_datasets and cfg.ind_dataset == "cifar10":
+        ic("places as OoD")
+        places_init_valid = torchvision.datasets.Places365(places_data_dir,
+                                                           split="val",
+                                                           small=True,
+                                                           download=False,
+                                                           transform=test_transforms, )
+        places_test_size = int((PLACES_TEST_SIZE / 2) * len(places_init_valid))
+        places_test = torch.utils.data.random_split(
+            places_init_valid,
+            [len(places_init_valid) - 2 * places_test_size, 2 * places_test_size],
+            torch.Generator().manual_seed(cfg.seed)
+        )[1]
+        places_valid, places_test = torch.utils.data.random_split(
+            places_test,
+            [places_test_size, places_test_size],
+            torch.Generator().manual_seed(cfg.seed)
+        )
+        # MNIST test set loader
+        ood_datasets_dict["places"] = {
+            "valid": DataLoader(places_valid, batch_size=1, shuffle=True),
+            "test": DataLoader(places_test, batch_size=1, shuffle=True)
+        }
+        del places_init_valid
+
+    ##########################################################
+    # Textures OoD
+    ##########################################################
+    if "textures" in cfg.ood_datasets and cfg.ind_dataset == "cifar10":
+        ic("textures as OoD")
+        textures_init_train = torchvision.datasets.DTD(textures_data_dir,
+                                                       split="train",
+                                                       download=True,
+                                                       transform=test_transforms, )
+        textures_init_val = torchvision.datasets.DTD(textures_data_dir,
+                                                     split="val",
+                                                     download=True,
+                                                     transform=test_transforms, )
+        textures_test = torchvision.datasets.DTD(textures_data_dir,
+                                                 split="test",
+                                                 download=True,
+                                                 transform=test_transforms, )
+        textures_val = torch.utils.data.ConcatDataset([textures_init_train, textures_init_val])
+        # MNIST test set loader
+        ood_datasets_dict["textures"] = {
+            "valid": DataLoader(textures_val, batch_size=1, shuffle=True),
+            "test": DataLoader(textures_test, batch_size=1, shuffle=True)
+        }
+        # del textures_init_valid
 
     ####################################################################
     # Load trained model
@@ -359,7 +417,7 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
 
     # Monte Carlo Dropout - Enable Dropout @ Test Time!
     def resnet18_enable_dropblock2d_test(m):
-        if type(m) == DropBlock2D:
+        if type(m) == DropBlock2D or type(m) == torch.nn.Dropout:
             m.train()
 
     rn_model.to(device)
@@ -370,8 +428,8 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
     mcd_samples_folder = f"./Mcd_samples/ind_{cfg.ind_dataset}/"
     os.makedirs(mcd_samples_folder, exist_ok=True)
     save_dir = f"{mcd_samples_folder}{cfg.model_path.split('/')[2]}/{cfg.layer_type}"
-    # assert not os.path.exists(save_dir), "Folder already exists!"
-    os.makedirs(save_dir,exist_ok=True)
+    assert not os.path.exists(save_dir), "Folder already exists!"
+    os.makedirs(save_dir)
     ####################################################################################################################
     ####################################################################################################################
     if EXTRACT_MCD_SAMPLES_AND_ENTROPIES:
@@ -396,6 +454,7 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
         # Extract and save InD samples and entropies
         ind_valid_test_entropies = []
         for split, data_loader in ind_dataset_dict.items():
+            print(f"\nExtracting InD {cfg.ind_dataset} {split}")
             mcd_samples, mcd_preds = mcd_extractor.get_ls_mcd_samples_baselines(data_loader)
             torch.save(
                 mcd_samples,
@@ -430,7 +489,7 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
 
         # Extract and save OoD samples and entropies
         for dataset_name, data_loaders in ood_datasets_dict.items():
-            print(f"saving samples and entropies from {dataset_name}")
+            print(f"Saving samples and entropies from {dataset_name}")
             mcd_samples_ood_v, mcd_preds_ood_v = mcd_extractor.get_ls_mcd_samples_baselines(data_loaders["valid"])
             torch.save(
                 mcd_samples_ood_v,
@@ -468,7 +527,7 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
     ind_valid_test_energy = []
     for split, data_loader in ind_dataset_dict.items():
         if not split == "train":
-            print(f"\nmsp and energy from InD {split}")
+            print(f"\nMsp and energy from InD {split}")
             if "msp" in cfg.baselines:
                 ind_valid_test_msp.append(
                     get_msp_score(dnn_model=rn_model.model, input_dataloader=data_loader)

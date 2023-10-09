@@ -31,7 +31,7 @@ ind_dataset: "cifar10"
 # For gtsrb as ind: "anomalies", "stl10", "cifar10"
 # For cifar10 as ind:
 #ood_datasets: ["anomalies", "stl10", "cifar10"]
-ood_datasets: ["anomalies", "gtsrb", "fmnist", "svhn"]
+ood_datasets: ["anomalies", "gtsrb", "fmnist", "svhn", "places", "textures"]
 
 # MCD parameters
 mcd_n_samples: 16
