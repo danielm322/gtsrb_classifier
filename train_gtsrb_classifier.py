@@ -125,7 +125,10 @@ def main(cfg: DictConfig) -> None:
                                 loss_fn=cfg.model.loss_type,
                                 optimizer_lr=cfg.model.lr,
                                 optimizer_weight_decay=cfg.model.weight_decay,
-                                max_nro_epochs=max_nro_epochs)
+                                max_nro_epochs=max_nro_epochs,
+                                activation=cfg.model.activation,
+                                avg_pool=cfg.model.avg_pool
+                                )
 
     ########################################
     #      Start Module/Model Training     #

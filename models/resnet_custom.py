@@ -8,7 +8,6 @@ from torch.nn.utils import spectral_norm
 from dropblock import DropBlock2D, LinearScheduler
 from icecream import ic
 
-
 __all__ = [
     "ResNet",
     "resnet18",
@@ -18,7 +17,6 @@ __all__ = [
     "resnet152"
 ]
 
-
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
     'resnet34': 'https://download.pytorch.org/models/resnet34-333f7ec4.pth',
@@ -26,6 +24,28 @@ model_urls = {
     'resnet101': 'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth',
     'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth'
 }
+
+
+class AvgPoolShortCut(nn.Module):
+    """
+    Strided average pooling as implemented for the DDU paper
+    This module replaces the 1x1 convolution down-sampling in resnet layers
+    """
+
+    def __init__(self, stride, out_c, in_c):
+        super(AvgPoolShortCut, self).__init__()
+        self.stride = stride
+        self.out_c = out_c
+        self.in_c = in_c
+
+    def forward(self, x):
+        if x.shape[2] % 2 != 0:
+            x = F.avg_pool2d(x, 1, self.stride)
+        else:
+            x = F.avg_pool2d(x, self.stride, self.stride)
+        pad = torch.zeros(x.shape[0], self.out_c - self.in_c, x.shape[2], x.shape[3], device=x.device, )
+        x = torch.cat((x, pad), dim=1)
+        return x
 
 
 def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
@@ -42,28 +62,29 @@ def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, d
     )
 
 
-def conv1x1(in_planes: int,out_planes: int, stride: int = 1) -> nn.Conv2d:
+def conv1x1(in_planes: int, out_planes: int, stride: int = 1) -> nn.Conv2d:
     """1x1 convolution"""
     return nn.Conv2d(in_planes,
                      out_planes,
                      kernel_size=1,
                      stride=stride,
                      bias=False)
-    
+
 
 class BasicBlock(nn.Module):
     expansion: int = 1
 
     def __init__(
-        self,
-        inplanes: int,
-        planes: int,
-        stride: int = 1,
-        downsample: Optional[nn.Module] = None,
-        groups: int = 1,
-        base_width: int = 64,
-        dilation: int = 1,
-        norm_layer: Optional[Callable[..., nn.Module]] = None,
+            self,
+            inplanes: int,
+            planes: int,
+            stride: int = 1,
+            downsample: Optional[nn.Module] = None,
+            groups: int = 1,
+            base_width: int = 64,
+            dilation: int = 1,
+            norm_layer: Optional[Callable[..., nn.Module]] = None,
+            activation: Optional[str] = "relu",
     ) -> None:
         super().__init__()
         if norm_layer is None:
@@ -75,7 +96,10 @@ class BasicBlock(nn.Module):
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = norm_layer(planes)
-        self.relu = nn.ReLU(inplace=True)
+        if activation == "relu":
+            self.activation = nn.ReLU(inplace=True)
+        else:
+            self.activation = nn.LeakyReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = norm_layer(planes)
         self.downsample = downsample
@@ -86,7 +110,7 @@ class BasicBlock(nn.Module):
 
         out = self.conv1(x)
         out = self.bn1(out)
-        out = self.relu(out)
+        out = self.activation(out)
 
         out = self.conv2(out)
         out = self.bn2(out)
@@ -95,24 +119,25 @@ class BasicBlock(nn.Module):
             identity = self.downsample(x)
 
         out += identity
-        out = self.relu(out)
+        out = self.activation(out)
 
         return out
-    
-    
+
+
 class BasicBlockSN(nn.Module):
     expansion: int = 1
 
     def __init__(
-        self,
-        inplanes: int,
-        planes: int,
-        stride: int = 1,
-        downsample: Optional[nn.Module] = None,
-        groups: int = 1,
-        base_width: int = 64,
-        dilation: int = 1,
-        norm_layer: Optional[Callable[..., nn.Module]] = None,
+            self,
+            inplanes: int,
+            planes: int,
+            stride: int = 1,
+            downsample: Optional[nn.Module] = None,
+            groups: int = 1,
+            base_width: int = 64,
+            dilation: int = 1,
+            norm_layer: Optional[Callable[..., nn.Module]] = None,
+            activation: Optional[str] = "relu",
     ) -> None:
         super().__init__()
         if norm_layer is None:
@@ -124,7 +149,10 @@ class BasicBlockSN(nn.Module):
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = spectral_norm(conv3x3(inplanes, planes, stride))
         self.bn1 = norm_layer(planes)
-        self.relu = nn.ReLU(inplace=True)
+        if activation == "relu":
+            self.activation = nn.ReLU(inplace=True)
+        else:
+            self.activation = nn.LeakyReLU(inplace=True)
         self.conv2 = spectral_norm(conv3x3(planes, planes))
         self.bn2 = norm_layer(planes)
         self.downsample = downsample
@@ -135,7 +163,7 @@ class BasicBlockSN(nn.Module):
 
         out = self.conv1(x)
         out = self.bn1(out)
-        out = self.relu(out)
+        out = self.activation(out)
 
         out = self.conv2(out)
         out = self.bn2(out)
@@ -144,7 +172,7 @@ class BasicBlockSN(nn.Module):
             identity = self.downsample(x)
 
         out += identity
-        out = self.relu(out)
+        out = self.activation(out)
 
         return out
 
@@ -159,15 +187,15 @@ class Bottleneck(nn.Module):
     expansion: int = 4
 
     def __init__(
-        self,
-        inplanes: int,
-        planes: int,
-        stride: int = 1,
-        downsample: Optional[nn.Module] = None,
-        groups: int = 1,
-        base_width: int = 64,
-        dilation: int = 1,
-        norm_layer: Optional[Callable[..., nn.Module]] = None,
+            self,
+            inplanes: int,
+            planes: int,
+            stride: int = 1,
+            downsample: Optional[nn.Module] = None,
+            groups: int = 1,
+            base_width: int = 64,
+            dilation: int = 1,
+            norm_layer: Optional[Callable[..., nn.Module]] = None,
     ) -> None:
         super().__init__()
         if norm_layer is None:
@@ -180,7 +208,7 @@ class Bottleneck(nn.Module):
         self.bn2 = norm_layer(width)
         self.conv3 = conv1x1(width, planes * self.expansion)
         self.bn3 = norm_layer(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
+        self.activation = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
 
@@ -189,11 +217,11 @@ class Bottleneck(nn.Module):
 
         out = self.conv1(x)
         out = self.bn1(out)
-        out = self.relu(out)
+        out = self.activation(out)
 
         out = self.conv2(out)
         out = self.bn2(out)
-        out = self.relu(out)
+        out = self.activation(out)
 
         out = self.conv3(out)
         out = self.bn3(out)
@@ -202,34 +230,37 @@ class Bottleneck(nn.Module):
             identity = self.downsample(x)
 
         out += identity
-        out = self.relu(out)
+        out = self.activation(out)
 
         return out
 
 
 class ResNet(nn.Module):
     def __init__(
-        self,
-        block: Type[Union[BasicBlock, Bottleneck]],
-        layers: List[int],
-        input_channels: int = 3,
-        num_classes: int = 1000,
-        zero_init_residual: bool = False,
-        groups: int = 1,
-        width_per_group: int = 64,
-        replace_stride_with_dilation: Optional[List[bool]] = None,
-        norm_layer: Optional[Callable[..., nn.Module]] = None,
-        dropblock: bool = False,
-        dropblock_prob: float = 0.0,
-        dropblock_block_size: int = 3,
-        dropout: bool = False,
-        dropout_prob: float = 0.0
+            self,
+            block: Type[Union[BasicBlock, Bottleneck]],
+            layers: List[int],
+            input_channels: int = 3,
+            num_classes: int = 1000,
+            zero_init_residual: bool = False,
+            groups: int = 1,
+            width_per_group: int = 64,
+            replace_stride_with_dilation: Optional[List[bool]] = None,
+            norm_layer: Optional[Callable[..., nn.Module]] = None,
+            dropblock: bool = False,
+            dropblock_prob: float = 0.0,
+            dropblock_block_size: int = 3,
+            dropout: bool = False,
+            dropout_prob: float = 0.0,
+            activation: str = "relu",
+            avg_pool: bool = False,
     ) -> None:
         super().__init__()
+        assert activation in ("relu", "leaky")
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
-
+        self.avg_pool = avg_pool
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
@@ -252,13 +283,19 @@ class ResNet(nn.Module):
         # network layers:
         self.conv1 = nn.Conv2d(self.input_channels, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = norm_layer(self.inplanes)
-        self.relu = nn.ReLU(inplace=True)
+        if activation == "relu":
+            self.activation = nn.ReLU(inplace=True)
+        else:
+            self.activation = nn.LeakyReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
-        
+        self.layer1 = self._make_layer(block, 64, layers[0], activation=activation)
+        self.layer2 = self._make_layer(block, 128, layers[1],
+                                       stride=2, dilate=replace_stride_with_dilation[0], activation=activation)
+        self.layer3 = self._make_layer(block, 256, layers[2],
+                                       stride=2, dilate=replace_stride_with_dilation[1], activation=activation)
+        self.layer4 = self._make_layer(block, 512, layers[3],
+                                       stride=2, dilate=replace_stride_with_dilation[2], activation=activation)
+
         if self.dropblock:
             self.dropblock2d_layer = DropBlock2D(drop_prob=self.dropblock_prob,
                                                  block_size=self.dropblock_block_size)
@@ -272,10 +309,10 @@ class ResNet(nn.Module):
             #         stop_value=self.dropblock_prob,
             #         nr_steps=int(25e3)
             #     )
-        
+
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
-        
+
         if self.dropout:
             self.dropout_layer = nn.Dropout(p=self.dropout_prob)
 
@@ -297,12 +334,13 @@ class ResNet(nn.Module):
                     nn.init.constant_(m.bn2.weight, 0)  # type: ignore[arg-type]
 
     def _make_layer(
-        self,
-        block: Type[Union[BasicBlock, Bottleneck]],
-        planes: int,
-        blocks: int,
-        stride: int = 1,
-        dilate: bool = False,
+            self,
+            block: Type[Union[BasicBlock, Bottleneck]],
+            planes: int,
+            blocks: int,
+            stride: int = 1,
+            dilate: bool = False,
+            activation: str = "relu"
     ) -> nn.Sequential:
         norm_layer = self._norm_layer
         downsample = None
@@ -311,15 +349,19 @@ class ResNet(nn.Module):
             self.dilation *= stride
             stride = 1
         if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
-                conv1x1(self.inplanes, planes * block.expansion, stride),
-                norm_layer(planes * block.expansion),
-            )
+            if self.avg_pool:
+                downsample = nn.Sequential(AvgPoolShortCut(stride, block.expansion * planes, self.inplanes))
+            else:
+                downsample = nn.Sequential(
+                    conv1x1(self.inplanes, planes * block.expansion, stride),
+                    norm_layer(planes * block.expansion),
+                )
 
         layers = []
         layers.append(
             block(
-                self.inplanes, planes, stride, downsample, self.groups, self.base_width, previous_dilation, norm_layer
+                self.inplanes, planes, stride, downsample, self.groups,
+                self.base_width, previous_dilation, norm_layer, activation
             )
         )
         self.inplanes = planes * block.expansion
@@ -332,6 +374,7 @@ class ResNet(nn.Module):
                     base_width=self.base_width,
                     dilation=self.dilation,
                     norm_layer=norm_layer,
+                    activation=activation
                 )
             )
 
@@ -341,7 +384,7 @@ class ResNet(nn.Module):
         # See note [TorchScript super()]
         x = self.conv1(x)
         x = self.bn1(x)
-        x = self.relu(x)
+        x = self.activation(x)
         x = self.maxpool(x)
 
         x1 = self.layer1(x)
@@ -362,7 +405,7 @@ class ResNet(nn.Module):
         # ic(x_avgpool.shape)
         x_flat = torch.flatten(x_avgpool, 1)
         # ic(x_flat.shape)
-        
+
         if self.dropout:
             x_flat = self.dropout_layer(x_flat)
 
@@ -374,7 +417,7 @@ class ResNet(nn.Module):
         return self._forward_impl(x)
 
 
-class ResNetSN(ResNet): 
+class ResNetSN(ResNet):
     def __init__(self,
                  block: Type[Union[BasicBlock, BasicBlockSN, Bottleneck]],
                  layers: List[int],
@@ -389,7 +432,9 @@ class ResNetSN(ResNet):
                  dropblock_prob: float = 0.0,
                  dropblock_block_size: int = 3,
                  dropout: bool = False,
-                 dropout_prob: float = 0.0) -> None:
+                 dropout_prob: float = 0.0,
+                 activation: str = "relu",
+                 avg_pool: bool = False) -> None:
         super().__init__(block,
                          layers,
                          input_channels,
@@ -403,14 +448,15 @@ class ResNetSN(ResNet):
                          dropblock_block_size,
                          dropout,
                          dropout_prob)
-        
+
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
-
+        self.avg_pool = avg_pool
+        self.activation = activation
         self.inplanes = 64
         self.dilation = 1
-        
+
         if replace_stride_with_dilation is None:
             # each element in the tuple indicates if we should replace
             # the 2x2 stride with a dilated convolution instead
@@ -420,12 +466,13 @@ class ResNetSN(ResNet):
                 "replace_stride_with_dilation should be None "
                 f"or a 3-element tuple, got {replace_stride_with_dilation}"
             )
-        
+
         self.layer1 = self._make_layer(BasicBlock, 64, layers[0])
         self.layer2 = self._make_layer(BasicBlock, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
         self.layer3 = self._make_layer(BasicBlockSN, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
         self.layer4 = self._make_layer(BasicBlockSN, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
         self.fc = spectral_norm(nn.Linear(512 * block.expansion, num_classes))
+
 
 def _resnet(arch_name: str,
             block: Type[Union[BasicBlock, BasicBlockSN, Bottleneck]],
@@ -438,21 +485,24 @@ def _resnet(arch_name: str,
             dropout: bool = False,
             dropout_prob: float = 0.0,
             spectral_norm: bool = False,
+            activation: str = "relu",
+            avg_pool: bool = False,
             pretrained: bool = False,
             progress: bool = True,
             **kwargs):
-    
     if not spectral_norm:
         model = ResNet(block,
-                    layers,
-                    input_channels=input_channels,
-                    num_classes=num_classes,
-                    dropblock=dropblock,
-                    dropblock_prob=dropblock_prob,
-                    dropblock_block_size=dropblock_block_size,
-                    dropout=dropout,
-                    dropout_prob=dropout_prob,
-                    **kwargs)
+                       layers,
+                       input_channels=input_channels,
+                       num_classes=num_classes,
+                       dropblock=dropblock,
+                       dropblock_prob=dropblock_prob,
+                       dropblock_block_size=dropblock_block_size,
+                       dropout=dropout,
+                       dropout_prob=dropout_prob,
+                       activation=activation,
+                       avg_pool=avg_pool,
+                       **kwargs)
     else:
         model = ResNetSN(block,
                          layers,
@@ -463,8 +513,10 @@ def _resnet(arch_name: str,
                          dropblock_block_size=dropblock_block_size,
                          dropout=dropout,
                          dropout_prob=dropout_prob,
+                         activation=activation,
+                         avg_pool=avg_pool,
                          **kwargs)
-    
+
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch_name], progress=progress)
         model.load_state_dict(state_dict)
@@ -481,8 +533,9 @@ def resnet18(input_channels=3,
              pretrained=False,
              progress=True,
              spectral_norm=False,
+             activation="relu",
+             avg_pool=False,
              **kwargs):
-
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
     Args:
@@ -500,6 +553,8 @@ def resnet18(input_channels=3,
                    dropout,
                    dropout_prob,
                    spectral_norm,
+                   activation,
+                   avg_pool,
                    pretrained,
                    progress,
                    **kwargs)
@@ -638,7 +693,7 @@ if __name__ == "__main__":
                               dropout=True,
                               dropout_prob=0.3,
                               spectral_norm=True)
-    
+
     resnet18_model.eval()
     ic(resnet18_model.layer1)
     ic(resnet18_model.layer2)

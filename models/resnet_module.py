@@ -24,6 +24,8 @@ class ResnetModule(pl.LightningModule):
                  dropblock_block_size: int = 3,
                  dropout: bool = False,
                  dropout_prob: float = 0.0,
+                 activation: str = "relu",
+                 avg_pool: bool = False,
                  loss_fn: str = 'cross_entropy',
                  optimizer_lr: float = 1e-4,
                  optimizer_weight_decay: float = 1e-5,
@@ -58,7 +60,9 @@ class ResnetModule(pl.LightningModule):
                               dropblock_block_size=self.dropblock_block_size,
                               dropout=self.dropout,
                               dropout_prob=self.dropout_prob,
-                              spectral_norm=self.spectral_norm) 
+                              spectral_norm=self.spectral_norm,
+                              activation=activation,
+                              avg_pool=avg_pool)
         # add Accuracy Metric
         self.metric_accuracy = torchmetrics.Accuracy(num_classes=self.num_classes)
         
