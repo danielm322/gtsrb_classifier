@@ -476,18 +476,19 @@ class ResNetSN(ResNet):
                          dropblock_prob,
                          dropblock_block_size,
                          dropout,
-                         dropout_prob)
+                         dropout_prob,
+                         activation,
+                         avg_pool,
+                         ash,
+                         ash_percentile,
+                         dice_precompute,
+                         dice_inference,
+                         dice_p,
+                         dice_info)
 
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
-        self.avg_pool = avg_pool
-        self.ash = ash
-        self.ash_percentile = ash_percentile
-        self.dice_precompute = dice_precompute
-        self.dice_inference = dice_inference
-        self.dice_p = dice_p
-        self.activation = activation
         self.inplanes = 64
         self.dilation = 1
 
@@ -500,12 +501,18 @@ class ResNetSN(ResNet):
                 "replace_stride_with_dilation should be None "
                 f"or a 3-element tuple, got {replace_stride_with_dilation}"
             )
+        self.layer1 = self._make_layer(BasicBlock, 64, layers[0], activation=activation)
+        self.layer2 = self._make_layer(BasicBlock, 128, layers[1], stride=2,
+                                       dilate=replace_stride_with_dilation[0], activation=activation)
+        self.layer3 = self._make_layer(BasicBlockSN, 256, layers[2], stride=2,
+                                       dilate=replace_stride_with_dilation[1], activation=activation)
+        self.layer4 = self._make_layer(BasicBlockSN, 512, layers[3], stride=2,
+                                       dilate=replace_stride_with_dilation[2], activation=activation)
+        if self.dice_inference:
+            self.fc = spectral_norm(RouteDICE(512 * block.expansion, num_classes, p=self.dice_p, info=dice_info))
+        else:
+            self.fc = spectral_norm(nn.Linear(512 * block.expansion, num_classes))
 
-        self.layer1 = self._make_layer(BasicBlock, 64, layers[0])
-        self.layer2 = self._make_layer(BasicBlock, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
-        self.layer3 = self._make_layer(BasicBlockSN, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
-        self.layer4 = self._make_layer(BasicBlockSN, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
-        self.fc = spectral_norm(nn.Linear(512 * block.expansion, num_classes))
 
 
 def _resnet(arch_name: str,

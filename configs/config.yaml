@@ -41,7 +41,7 @@ architecture: "resnet"
 hook_location: 2
 reduction_method: "fullmean"
 original_resnet_architecture: True
-model_path: "./lightning_logs/2023-10-09_13-50-27_ind_cifar10_sn_128_di_norm_input_eaug_db5_lrelu_avpool/epoch=151-step=95000.ckpt"  # Daniel
+model_path: "./lightning_logs/2023-10-10_09-10-13_ind_cifar10_vanilla_128_no_do_norm_input_eaug/epoch=239-step=150000.ckpt"  # Daniel
 train_subsamples_size: 0.21  # of the train dataset to perform the OoD detection tasks, not the training
 n_pca_components: [2, 6, 12, 20, 24, 28, 32, 36, 44, 52]
 #n_pca_components: [2, 6, 12, 20, 24, 28, 32, 36, 44, 52, 60, 68, 74]
@@ -50,6 +50,7 @@ n_pca_components: [2, 6, 12, 20, 24, 28, 32, 36, 44, 52]
 #baselines: []
 baselines: ["msp", "energy", "mdist", "knn", "ash"]
 ash_percentile: 80
+dice_p: 90
 
 hydra:
     # output paths for hydra logs
