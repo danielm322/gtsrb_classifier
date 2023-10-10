@@ -1,4 +1,4 @@
-from typing import Tuple, List, Any, Optional
+from typing import Any, Optional, Union
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,6 +8,7 @@ import torchmetrics
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from .resnet_custom import resnet18
 from loss import FocalLoss
+from numpy import array
 
 
 class ResnetModule(pl.LightningModule):
@@ -29,7 +30,13 @@ class ResnetModule(pl.LightningModule):
                  loss_fn: str = 'cross_entropy',
                  optimizer_lr: float = 1e-4,
                  optimizer_weight_decay: float = 1e-5,
-                 max_nro_epochs: int = None) -> None:
+                 max_nro_epochs: int = None,
+                 ash: bool = False,
+                 ash_percentile: int = 80,
+                 dice_precompute: bool = False,
+                 dice_inference: bool = False,
+                 dice_p: int = 90,
+                 dice_info: Union[None, array] = None) -> None:
         super().__init__()
         
         if arch_name not in ["resnet18","resnet34", "resnet50", "resnet101", "resnet152"]:
@@ -62,7 +69,13 @@ class ResnetModule(pl.LightningModule):
                               dropout_prob=self.dropout_prob,
                               spectral_norm=self.spectral_norm,
                               activation=activation,
-                              avg_pool=avg_pool)
+                              avg_pool=avg_pool,
+                              ash=ash,
+                              ash_percentile=ash_percentile,
+                              dice_precompute=dice_precompute,
+                              dice_inference=dice_inference,
+                              dice_p=dice_p,
+                              dice_info=dice_info)
         # add Accuracy Metric
         self.metric_accuracy = torchmetrics.Accuracy(num_classes=self.num_classes)
         

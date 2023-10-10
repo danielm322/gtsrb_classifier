@@ -248,8 +248,8 @@ def main(cfg: DictConfig) -> None:
             # Add results to df
             overall_metrics_df = overall_metrics_df.append(r_df)
 
-        overall_metrics_df_name = f"./results_csvs/{current_date}_experiment.csv"
-        overall_metrics_df.to_csv(path_or_buf=overall_metrics_df_name)
+        overall_metrics_df_name = f"./results_csvs/{current_date}_experiment.csv.gz"
+        overall_metrics_df.to_csv(path_or_buf=overall_metrics_df_name, compression="gzip")
         mlflow.log_artifact(overall_metrics_df_name)
 
         # Plot Roc curves together, by OoD dataset
@@ -329,6 +329,11 @@ baseline_name_dict = {
         "plot_title": "kNN distance distribution",
         "x_axis": "kNN Distance score",
         "plot_name": "pred_knn"
+    },
+    "ash": {
+        "plot_title": "ASH score distribution",
+        "x_axis": "ASH score",
+        "plot_name": "ash_score"
     }
 }
 

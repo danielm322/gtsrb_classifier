@@ -18,6 +18,7 @@ from dropblock import DropBlock2D
 from ls_ood_detect_cea.uncertainty_estimation import Hook, MCDSamplesExtractor, \
     get_msp_score, get_energy_score, MDSPostprocessor, KNNPostprocessor
 from ls_ood_detect_cea.uncertainty_estimation import get_dl_h_z
+import warnings
 
 # Datasets paths
 gtsrb_path = "./data/gtsrb-data/"
@@ -33,8 +34,9 @@ N_WORKERS = os.cpu_count() - 4 if os.cpu_count() >= 8 else os.cpu_count() - 2
 CIFAR10_TEST_SIZE = 0.5  # From test size 10000 default:0.5
 FMNIST_TEST_SIZE = 0.5  # From test size 10000 default:0.5
 SVHN_TEST_SIZE = 0.2  # From test size 26000 default:0.2
-PLACES_TEST_SIZE = 0.2  # From test size 36500 default:0.14
+PLACES_TEST_SIZE = 0.14  # From test size 36500 default:0.14
 EXTRACT_MCD_SAMPLES_AND_ENTROPIES = True  # set False for debugging purposes
+EXTRACT_IND = True
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="config.yaml")
@@ -428,8 +430,9 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
     mcd_samples_folder = f"./Mcd_samples/ind_{cfg.ind_dataset}/"
     os.makedirs(mcd_samples_folder, exist_ok=True)
     save_dir = f"{mcd_samples_folder}{cfg.model_path.split('/')[2]}/{cfg.layer_type}"
-    assert not os.path.exists(save_dir), "Folder already exists!"
-    os.makedirs(save_dir)
+    if os.path.exists(save_dir):
+        warnings.warn(f"Destination folder {save_dir} already exists!")
+    os.makedirs(save_dir, exist_ok=True)
     ####################################################################################################################
     ####################################################################################################################
     if EXTRACT_MCD_SAMPLES_AND_ENTROPIES:
@@ -450,42 +453,42 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
             original_resnet_architecture=cfg.original_resnet_architecture,
             return_raw_predictions=True
         )
-
-        # Extract and save InD samples and entropies
-        ind_valid_test_entropies = []
-        for split, data_loader in ind_dataset_dict.items():
-            print(f"\nExtracting InD {cfg.ind_dataset} {split}")
-            mcd_samples, mcd_preds = mcd_extractor.get_ls_mcd_samples_baselines(data_loader)
-            torch.save(
-                mcd_samples,
-                f"{save_dir}/{cfg.ind_dataset}_{split}_{mcd_samples.shape[0]}_{mcd_samples.shape[1]}_mcd_samples.pt",
-            )
-            if not split == "train":
+        if EXTRACT_IND:
+            # Extract and save InD samples and entropies
+            ind_valid_test_entropies = []
+            for split, data_loader in ind_dataset_dict.items():
+                print(f"\nExtracting InD {cfg.ind_dataset} {split}")
+                mcd_samples, mcd_preds = mcd_extractor.get_ls_mcd_samples_baselines(data_loader)
                 torch.save(
-                    mcd_preds,
-                    f"{save_dir}/{cfg.ind_dataset}_{split}_mcd_preds.pt",
+                    mcd_samples,
+                    f"{save_dir}/{cfg.ind_dataset}_{split}_{mcd_samples.shape[0]}_{mcd_samples.shape[1]}_mcd_samples.pt",
                 )
-            ind_h_z_samples_np = get_dl_h_z(mcd_samples,
-                                            mcd_samples_nro=cfg.mcd_n_samples,
-                                            parallel_run=True)[1]
-            if split == "train":
-                np.save(
-                    f"{save_dir}/{cfg.ind_dataset}_h_z_train", ind_h_z_samples_np,
-                )
-            else:
-                ind_valid_test_entropies.append(ind_h_z_samples_np)
+                if not split == "train":
+                    torch.save(
+                        mcd_preds,
+                        f"{save_dir}/{cfg.ind_dataset}_{split}_mcd_preds.pt",
+                    )
+                ind_h_z_samples_np = get_dl_h_z(mcd_samples,
+                                                mcd_samples_nro=cfg.mcd_n_samples,
+                                                parallel_run=True)[1]
+                if split == "train":
+                    np.save(
+                        f"{save_dir}/{cfg.ind_dataset}_h_z_train", ind_h_z_samples_np,
+                    )
+                else:
+                    ind_valid_test_entropies.append(ind_h_z_samples_np)
 
-        ind_h_z = np.concatenate(
-            (ind_valid_test_entropies[0], ind_valid_test_entropies[1])
-        )
-        np.save(
-            f"{save_dir}/{cfg.ind_dataset}_h_z", ind_h_z,
-        )
-        del mcd_samples
-        del mcd_preds
-        del ind_h_z
-        del ind_valid_test_entropies
-        del ind_h_z_samples_np
+            ind_h_z = np.concatenate(
+                (ind_valid_test_entropies[0], ind_valid_test_entropies[1])
+            )
+            np.save(
+                f"{save_dir}/{cfg.ind_dataset}_h_z", ind_h_z,
+            )
+            del mcd_samples
+            del mcd_preds
+            del ind_h_z
+            del ind_valid_test_entropies
+            del ind_h_z_samples_np
 
         # Extract and save OoD samples and entropies
         for dataset_name, data_loaders in ood_datasets_dict.items():
@@ -617,6 +620,34 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
                                                                      gtsrb_model_avgpool_layer_hook)[1]
             ood_kth_dist_score = np.concatenate((ood_valid_kth_dist_score, ood_test_kth_dist_score))
             np.save(f"{save_dir}/{dataset_name}_knn", ood_kth_dist_score)
+
+    ##########################################
+    # ASH-P
+    #######################################
+    rn_model.model.ash = True
+    rn_model.eval()  # No MCD needed here
+    # InD data
+    ind_valid_test_ash = []
+    for split, data_loader in ind_dataset_dict.items():
+        if not split == "train":
+            print(f"\nASH from InD {split}")
+            if "ash" in cfg.baselines:
+                ind_valid_test_ash.append(
+                    get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loader)
+                )
+
+    # Concatenate
+    if "ash" in cfg.baselines:
+        ind_ash_score = np.concatenate((ind_valid_test_ash[0], ind_valid_test_ash[1]))
+        np.save(f"{save_dir}/{cfg.ind_dataset}_ash", ind_ash_score)
+
+    for dataset_name, data_loaders in ood_datasets_dict.items():
+        print(f"\nASH from OoD {dataset_name}")
+        if "ash" in cfg.baselines:
+            ood_test_ash_score = get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loaders["test"])
+            ood_valid_ash_score = get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loaders["valid"])
+            ood_ash_score = np.concatenate((ood_test_ash_score, ood_valid_ash_score))
+            np.save(f"{save_dir}/{dataset_name}_ash", ood_ash_score)
 
     print("Done!")
 

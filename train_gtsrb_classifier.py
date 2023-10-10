@@ -127,7 +127,13 @@ def main(cfg: DictConfig) -> None:
                                 optimizer_weight_decay=cfg.model.weight_decay,
                                 max_nro_epochs=max_nro_epochs,
                                 activation=cfg.model.activation,
-                                avg_pool=cfg.model.avg_pool
+                                avg_pool=cfg.model.avg_pool,
+                                ash=False,
+                                ash_percentile=cfg.ash_percentile,
+                                dice_precompute=False,
+                                dice_inference=False,
+                                dice_p=cfg.dice_p,
+                                dice_info=None
                                 )
 
     ########################################

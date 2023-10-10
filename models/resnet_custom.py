@@ -5,8 +5,12 @@ import torch.nn as nn
 from torch.hub import load_state_dict_from_url
 from torch import Tensor
 from torch.nn.utils import spectral_norm
-from dropblock import DropBlock2D, LinearScheduler
+import torch.nn.functional as F
+from dropblock import DropBlock2D
 from icecream import ic
+from numpy import array
+from models.resnet_ash import ash_p
+from models.resnet_dice import RouteDICE
 
 __all__ = [
     "ResNet",
@@ -254,6 +258,12 @@ class ResNet(nn.Module):
             dropout_prob: float = 0.0,
             activation: str = "relu",
             avg_pool: bool = False,
+            ash: bool = False,
+            ash_percentile: int = 80,
+            dice_precompute: bool = False,
+            dice_inference: bool = False,
+            dice_p: int = 90,
+            dice_info: Union[None, array] = None
     ) -> None:
         super().__init__()
         assert activation in ("relu", "leaky")
@@ -261,6 +271,11 @@ class ResNet(nn.Module):
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
         self.avg_pool = avg_pool
+        self.ash = ash
+        self.ash_percentile = ash_percentile
+        self.dice_precompute = dice_precompute
+        self.dice_inference = dice_inference
+        self.dice_p = dice_p
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
@@ -311,7 +326,10 @@ class ResNet(nn.Module):
             #     )
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        if self.dice_inference:
+            self.fc = RouteDICE(512 * block.expansion, num_classes, p=self.dice_p, info=dice_info)
+        else:
+            self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         if self.dropout:
             self.dropout_layer = nn.Dropout(p=self.dropout_prob)
@@ -401,8 +419,12 @@ class ResNet(nn.Module):
         # ic(x3.shape)
         x4 = self.layer4(x3)
         # ic(x4.shape)
+        if self.dice_precompute:
+            return x4
         x_avgpool = self.avgpool(x4)
         # ic(x_avgpool.shape)
+        if self.ash:
+            x_avgpool = ash_p(x_avgpool, percentile=self.ash_percentile)
         x_flat = torch.flatten(x_avgpool, 1)
         # ic(x_flat.shape)
 
@@ -434,7 +456,14 @@ class ResNetSN(ResNet):
                  dropout: bool = False,
                  dropout_prob: float = 0.0,
                  activation: str = "relu",
-                 avg_pool: bool = False) -> None:
+                 avg_pool: bool = False,
+                 ash: bool = False,
+                 ash_percentile: int = 80,
+                 dice_precompute: bool = False,
+                 dice_inference: bool = False,
+                 dice_p: int = 90,
+                 dice_info: Union[None, array] = None
+                 ) -> None:
         super().__init__(block,
                          layers,
                          input_channels,
@@ -453,6 +482,11 @@ class ResNetSN(ResNet):
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
         self.avg_pool = avg_pool
+        self.ash = ash
+        self.ash_percentile = ash_percentile
+        self.dice_precompute = dice_precompute
+        self.dice_inference = dice_inference
+        self.dice_p = dice_p
         self.activation = activation
         self.inplanes = 64
         self.dilation = 1
@@ -487,6 +521,12 @@ def _resnet(arch_name: str,
             spectral_norm: bool = False,
             activation: str = "relu",
             avg_pool: bool = False,
+            ash: bool = False,
+            ash_percentile: int = 80,
+            dice_precompute: bool = False,
+            dice_inference: bool = False,
+            dice_p: int = 90,
+            dice_info: Union[None, array] = None,
             pretrained: bool = False,
             progress: bool = True,
             **kwargs):
@@ -502,6 +542,12 @@ def _resnet(arch_name: str,
                        dropout_prob=dropout_prob,
                        activation=activation,
                        avg_pool=avg_pool,
+                       ash=ash,
+                       ash_percentile=ash_percentile,
+                       dice_precompute=dice_precompute,
+                       dice_inference=dice_inference,
+                       dice_p=dice_p,
+                       dice_info=dice_info,
                        **kwargs)
     else:
         model = ResNetSN(block,
@@ -515,6 +561,12 @@ def _resnet(arch_name: str,
                          dropout_prob=dropout_prob,
                          activation=activation,
                          avg_pool=avg_pool,
+                         ash=ash,
+                         ash_percentile=ash_percentile,
+                         dice_precompute=dice_precompute,
+                         dice_inference=dice_inference,
+                         dice_p=dice_p,
+                         dice_info=dice_info,
                          **kwargs)
 
     if pretrained:
@@ -535,6 +587,12 @@ def resnet18(input_channels=3,
              spectral_norm=False,
              activation="relu",
              avg_pool=False,
+             ash=False,
+             ash_percentile=80,
+             dice_precompute=False,
+             dice_inference=False,
+             dice_p=90,
+             dice_info=None,
              **kwargs):
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -555,6 +613,12 @@ def resnet18(input_channels=3,
                    spectral_norm,
                    activation,
                    avg_pool,
+                   ash,
+                   ash_percentile,
+                   dice_precompute,
+                   dice_inference,
+                   dice_p,
+                   dice_info,
                    pretrained,
                    progress,
                    **kwargs)

@@ -83,19 +83,19 @@ def get_cifar10_input_transformations(cifar10_normalize_inputs: bool,
                     A.Resize(img_size, img_size, p=1),
                     A.OneOf([
                         # A.MotionBlur(blur_limit=16, p=1.0),
-                        A.RandomFog(fog_coef_lower=0.5,  # Orig 0.7
-                                    fog_coef_upper=0.7,  # Orig 0.9
-                                    alpha_coef=0.6,  # Orig 0.8
+                        A.RandomFog(fog_coef_lower=0.4,  # Orig 0.7
+                                    fog_coef_upper=0.6,  # Orig 0.9
+                                    alpha_coef=0.5,  # Orig 0.8
                                     p=1.0),
                         A.RandomSunFlare(flare_roi=(0.3, 0.3, 0.7, 0.7),
-                                         src_radius=int(img_size * 0.6),  # Orig 0.8
-                                         num_flare_circles_lower=6,  # Orig 8
-                                         num_flare_circles_upper=11,  # Orig 12
+                                         src_radius=int(img_size * 0.5),  # Orig 0.8
+                                         num_flare_circles_lower=5,  # Orig 8
+                                         num_flare_circles_upper=9,  # Orig 12
                                          angle_lower=0.5,
                                          p=1.0),
-                        A.RandomSnow(brightness_coeff=2.0,  # Orig 2.5
-                                     snow_point_lower=0.4,  # Orig 0.6
-                                     snow_point_upper=0.6,  # Orig 0.8
+                        A.RandomSnow(brightness_coeff=1.5,  # Orig 2.5
+                                     snow_point_lower=0.2,  # Orig 0.6
+                                     snow_point_upper=0.4,  # Orig 0.8
                                      p=1.0)
                     ], p=1.0),
                     A.Normalize(mean=np.array([125.3, 123.0, 113.9]), std=np.array([63.0, 62.1, 66.7])),
