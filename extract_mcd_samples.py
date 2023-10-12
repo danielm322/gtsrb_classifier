@@ -16,7 +16,7 @@ from datasets.cifar10 import get_cifar10_input_transformations, fmnist_to_cifar_
 from models import ResnetModule
 from dropblock import DropBlock2D
 from ls_ood_detect_cea.uncertainty_estimation import Hook, MCDSamplesExtractor, \
-    get_msp_score, get_energy_score, MDSPostprocessor, KNNPostprocessor
+    get_msp_score, get_energy_score, MDSPostprocessor, KNNPostprocessor, get_dice_feat_mean
 from ls_ood_detect_cea.uncertainty_estimation import get_dl_h_z
 import warnings
 
@@ -624,30 +624,80 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
     ##########################################
     # ASH-P
     #######################################
-    rn_model.model.ash = True
-    rn_model.eval()  # No MCD needed here
-    # InD data
-    ind_valid_test_ash = []
-    for split, data_loader in ind_dataset_dict.items():
-        if not split == "train":
-            print(f"\nASH from InD {split}")
-            if "ash" in cfg.baselines:
+    if "ash" in cfg.baselines:
+        rn_model.model.ash = True
+        rn_model.eval()  # No MCD needed here
+        # InD data
+        ind_valid_test_ash = []
+        for split, data_loader in ind_dataset_dict.items():
+            if not split == "train":
+                print(f"\nASH from InD {split}")
                 ind_valid_test_ash.append(
                     get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loader)
                 )
 
-    # Concatenate
-    if "ash" in cfg.baselines:
+        # Concatenate and save
         ind_ash_score = np.concatenate((ind_valid_test_ash[0], ind_valid_test_ash[1]))
         np.save(f"{save_dir}/{cfg.ind_dataset}_ash", ind_ash_score)
 
-    for dataset_name, data_loaders in ood_datasets_dict.items():
-        print(f"\nASH from OoD {dataset_name}")
-        if "ash" in cfg.baselines:
+        for dataset_name, data_loaders in ood_datasets_dict.items():
+            print(f"\nASH from OoD {dataset_name}")
             ood_test_ash_score = get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loaders["test"])
             ood_valid_ash_score = get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loaders["valid"])
             ood_ash_score = np.concatenate((ood_test_ash_score, ood_valid_ash_score))
             np.save(f"{save_dir}/{dataset_name}_ash", ood_ash_score)
+        rn_model.model.ash = False
+
+    ##########################################
+    # DICE
+    #######################################
+    if "dice" in cfg.baselines:
+        # Precompute DICE
+        rn_model.model.dice_precompute = True
+        dice_info_mean = get_dice_feat_mean(rn_model.model, ind_dataset_dict["train"])
+
+        # Inference DICE
+        rn_model = ResnetModule(arch_name=cfg.model.model_name,
+                                input_channels=cfg.model.input_channels,
+                                num_classes=10 if cfg.ind_dataset == "cifar10" else 43,
+                                spectral_norm=cfg.model.spectral_norm,
+                                dropblock=cfg.model.drop_block,
+                                dropblock_prob=cfg.model.dropblock_prob,
+                                dropblock_block_size=cfg.model.dropblock_block_size,
+                                dropout=cfg.model.dropout,
+                                dropout_prob=cfg.model.dropout_prob,
+                                loss_fn=cfg.model.loss_type,
+                                optimizer_lr=cfg.model.lr,
+                                optimizer_weight_decay=cfg.model.weight_decay,
+                                max_nro_epochs=cfg.trainer.epochs,
+                                activation=cfg.model.activation,
+                                avg_pool=cfg.model.avg_pool,
+                                ash=False,
+                                ash_percentile=cfg.ash_percentile,
+                                dice_precompute=False,
+                                dice_inference=True,
+                                dice_p=cfg.dice_p,
+                                dice_info=dice_info_mean
+                                )
+        rn_model.load_from_checkpoint(checkpoint_path=cfg.model_path)
+        rn_model.to(device)
+        rn_model.eval()
+        ind_valid_test_dice = []
+        for split, data_loader in ind_dataset_dict.items():
+            if not split == "train":
+                print(f"\nDICE from InD {split}")
+                ind_valid_test_dice.append(
+                    get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loader)
+                )
+        ind_dice_score = np.concatenate((ind_valid_test_dice[0], ind_valid_test_dice[1]))
+        np.save(f"{save_dir}/{cfg.ind_dataset}_dice", ind_dice_score)
+
+        for dataset_name, data_loaders in ood_datasets_dict.items():
+            print(f"\nDICE from OoD {dataset_name}")
+            ood_test_dice_score = get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loaders["test"])
+            ood_valid_dice_score = get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loaders["valid"])
+            ood_dice_score = np.concatenate((ood_test_dice_score, ood_valid_dice_score))
+            np.save(f"{save_dir}/{dataset_name}_dice", ood_dice_score)
 
     print("Done!")
 

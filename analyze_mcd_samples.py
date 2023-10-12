@@ -25,7 +25,7 @@ assert UPLOAD_FROM_SERVER_TO_SERVER + UPLOAD_FROM_LOCAL_TO_SERVER <= 1
 def main(cfg: DictConfig) -> None:
     # Get date-time to save df later
     current_date = cfg.log_dir.split("/")[-1]
-    # Get sampels folder
+    # Get samples folder
     mcd_samples_folder = f"./Mcd_samples/ind_{cfg.ind_dataset}/"
     save_dir = f"{mcd_samples_folder}{cfg.model_path.split('/')[2]}/{cfg.layer_type}"
     all_baselines = ["pred_h", "mi"]
@@ -34,15 +34,13 @@ def main(cfg: DictConfig) -> None:
     # Load all data
     ######################################################################
     # Raw predictions
-    ind_data_dict = {}
-    ind_data_dict["valid_preds"] = torch.load(
+    ind_data_dict = {"valid_preds": torch.load(
         f=op_join(save_dir, f"{cfg.ind_dataset}_valid_mcd_preds.pt"),
         map_location=device
-    )
-    ind_data_dict["test_preds"] = torch.load(
+    ), "test_preds": torch.load(
         f=op_join(save_dir, f"{cfg.ind_dataset}_test_mcd_preds.pt"),
         map_location=device
-    )
+    )}
     # Useful only to calculate the predictive entropy score and the mutual information
     ood_raw_preds_dict = {}
     for dataset_name in cfg.ood_datasets:
@@ -109,6 +107,7 @@ def main(cfg: DictConfig) -> None:
     ##########################################################################
     # Define mlflow run to log metrics and parameters
     with mlflow.start_run(experiment_id=experiment.experiment_id) as run:
+        print("run_id: {}; status: {}".format(run.info.run_id, run.info.status))
         # Log parameters with mlflow
         log_params_from_omegaconf_dict(cfg)
         ##########################################################################################
@@ -334,6 +333,11 @@ baseline_name_dict = {
         "plot_title": "ASH score distribution",
         "x_axis": "ASH score",
         "plot_name": "ash_score"
+    },
+    "dice": {
+        "plot_title": "DICE score distribution",
+        "x_axis": "DICE score",
+        "plot_name": "dice_score"
     }
 }
 
