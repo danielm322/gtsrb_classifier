@@ -133,7 +133,8 @@ def main(cfg: DictConfig) -> None:
                                 dice_precompute=False,
                                 dice_inference=False,
                                 dice_p=cfg.dice_p,
-                                dice_info=None
+                                dice_info=None,
+                                react_threshold=None
                                 )
 
     ########################################

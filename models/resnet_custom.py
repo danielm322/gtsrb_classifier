@@ -263,7 +263,8 @@ class ResNet(nn.Module):
             dice_precompute: bool = False,
             dice_inference: bool = False,
             dice_p: int = 90,
-            dice_info: Union[None, array] = None
+            dice_info: Union[None, array] = None,
+            react_threshold: Union[None, float] = None
     ) -> None:
         super().__init__()
         assert activation in ("relu", "leaky")
@@ -276,6 +277,7 @@ class ResNet(nn.Module):
         self.dice_precompute = dice_precompute
         self.dice_inference = dice_inference
         self.dice_p = dice_p
+        self.react_threshold = react_threshold
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
@@ -422,6 +424,8 @@ class ResNet(nn.Module):
         if self.dice_precompute:
             return x4
         x_avgpool = self.avgpool(x4)
+        if self.react_threshold is not None:
+            x_avgpool = x_avgpool.clip(max=self.react_threshold)
         # ic(x_avgpool.shape)
         if self.ash:
             x_avgpool = ash_p(x_avgpool, percentile=self.ash_percentile)
@@ -462,7 +466,8 @@ class ResNetSN(ResNet):
                  dice_precompute: bool = False,
                  dice_inference: bool = False,
                  dice_p: int = 90,
-                 dice_info: Union[None, array] = None
+                 dice_info: Union[None, array] = None,
+                 react_threshold: Union[None, int] = None
                  ) -> None:
         super().__init__(block,
                          layers,
@@ -484,7 +489,8 @@ class ResNetSN(ResNet):
                          dice_precompute,
                          dice_inference,
                          dice_p,
-                         dice_info)
+                         dice_info,
+                         react_threshold)
 
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -534,6 +540,7 @@ def _resnet(arch_name: str,
             dice_inference: bool = False,
             dice_p: int = 90,
             dice_info: Union[None, array] = None,
+            react_threshold: Union[None, float] = None,
             pretrained: bool = False,
             progress: bool = True,
             **kwargs):
@@ -555,6 +562,7 @@ def _resnet(arch_name: str,
                        dice_inference=dice_inference,
                        dice_p=dice_p,
                        dice_info=dice_info,
+                       react_threshold=react_threshold,
                        **kwargs)
     else:
         model = ResNetSN(block,
@@ -574,6 +582,7 @@ def _resnet(arch_name: str,
                          dice_inference=dice_inference,
                          dice_p=dice_p,
                          dice_info=dice_info,
+                         react_threshold=react_threshold,
                          **kwargs)
 
     if pretrained:
@@ -600,6 +609,7 @@ def resnet18(input_channels=3,
              dice_inference=False,
              dice_p=90,
              dice_info=None,
+             react_threshold=None,
              **kwargs):
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -626,6 +636,7 @@ def resnet18(input_channels=3,
                    dice_inference,
                    dice_p,
                    dice_info,
+                   react_threshold,
                    pretrained,
                    progress,
                    **kwargs)

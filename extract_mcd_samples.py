@@ -16,7 +16,7 @@ from datasets.cifar10 import get_cifar10_input_transformations, fmnist_to_cifar_
 from models import ResnetModule
 from dropblock import DropBlock2D
 from ls_ood_detect_cea.uncertainty_estimation import Hook, MCDSamplesExtractor, \
-    get_msp_score, get_energy_score, MDSPostprocessor, KNNPostprocessor, get_dice_feat_mean
+    get_msp_score, get_energy_score, MDSPostprocessor, KNNPostprocessor, get_dice_feat_mean_react_percentile
 from ls_ood_detect_cea.uncertainty_estimation import get_dl_h_z
 import warnings
 
@@ -649,55 +649,153 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
         rn_model.model.ash = False
 
     ##########################################
-    # DICE
+    # DICE and ReAct
     #######################################
-    if "dice" in cfg.baselines:
-        # Precompute DICE
+    if "dice" in cfg.baselines or "react" in cfg.baselines or "dice_react" in cfg.baselines:
+        # Precompute DICE and ReAct threshold
         rn_model.model.dice_precompute = True
-        dice_info_mean = get_dice_feat_mean(rn_model.model, ind_dataset_dict["train"])
+        dice_info_mean, react_threshold = get_dice_feat_mean_react_percentile(rn_model.model,
+                                                                              ind_dataset_dict["train"],
+                                                                              cfg.react_percentile)
+        #######
+        # ReAct
+        if "react" in cfg.baselines:
+            # Inference REACT
+            rn_model = ResnetModule(arch_name=cfg.model.model_name,
+                                    input_channels=cfg.model.input_channels,
+                                    num_classes=10 if cfg.ind_dataset == "cifar10" else 43,
+                                    spectral_norm=cfg.model.spectral_norm,
+                                    dropblock=cfg.model.drop_block,
+                                    dropblock_prob=cfg.model.dropblock_prob,
+                                    dropblock_block_size=cfg.model.dropblock_block_size,
+                                    dropout=cfg.model.dropout,
+                                    dropout_prob=cfg.model.dropout_prob,
+                                    loss_fn=cfg.model.loss_type,
+                                    optimizer_lr=cfg.model.lr,
+                                    optimizer_weight_decay=cfg.model.weight_decay,
+                                    max_nro_epochs=cfg.trainer.epochs,
+                                    activation=cfg.model.activation,
+                                    avg_pool=cfg.model.avg_pool,
+                                    ash=False,
+                                    ash_percentile=cfg.ash_percentile,
+                                    dice_precompute=False,
+                                    dice_inference=False,
+                                    dice_p=cfg.dice_p,
+                                    dice_info=None,
+                                    react_threshold=react_threshold
+                                    )
+            rn_model.load_from_checkpoint(checkpoint_path=cfg.model_path)
+            rn_model.to(device)
+            rn_model.eval()
+            ind_valid_test_react = []
+            for split, data_loader in ind_dataset_dict.items():
+                if not split == "train":
+                    print(f"\nReAct from InD {split}")
+                    ind_valid_test_react.append(
+                        get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loader)
+                    )
+            ind_react_score = np.concatenate((ind_valid_test_react[0], ind_valid_test_react[1]))
+            np.save(f"{save_dir}/{cfg.ind_dataset}_react", ind_react_score)
 
-        # Inference DICE
-        rn_model = ResnetModule(arch_name=cfg.model.model_name,
-                                input_channels=cfg.model.input_channels,
-                                num_classes=10 if cfg.ind_dataset == "cifar10" else 43,
-                                spectral_norm=cfg.model.spectral_norm,
-                                dropblock=cfg.model.drop_block,
-                                dropblock_prob=cfg.model.dropblock_prob,
-                                dropblock_block_size=cfg.model.dropblock_block_size,
-                                dropout=cfg.model.dropout,
-                                dropout_prob=cfg.model.dropout_prob,
-                                loss_fn=cfg.model.loss_type,
-                                optimizer_lr=cfg.model.lr,
-                                optimizer_weight_decay=cfg.model.weight_decay,
-                                max_nro_epochs=cfg.trainer.epochs,
-                                activation=cfg.model.activation,
-                                avg_pool=cfg.model.avg_pool,
-                                ash=False,
-                                ash_percentile=cfg.ash_percentile,
-                                dice_precompute=False,
-                                dice_inference=True,
-                                dice_p=cfg.dice_p,
-                                dice_info=dice_info_mean
-                                )
-        rn_model.load_from_checkpoint(checkpoint_path=cfg.model_path)
-        rn_model.to(device)
-        rn_model.eval()
-        ind_valid_test_dice = []
-        for split, data_loader in ind_dataset_dict.items():
-            if not split == "train":
-                print(f"\nDICE from InD {split}")
-                ind_valid_test_dice.append(
-                    get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loader)
-                )
-        ind_dice_score = np.concatenate((ind_valid_test_dice[0], ind_valid_test_dice[1]))
-        np.save(f"{save_dir}/{cfg.ind_dataset}_dice", ind_dice_score)
+            for dataset_name, data_loaders in ood_datasets_dict.items():
+                print(f"\nReAct from OoD {dataset_name}")
+                ood_test_react_score = get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loaders["test"])
+                ood_valid_react_score = get_energy_score(dnn_model=rn_model.model,
+                                                         input_dataloader=data_loaders["valid"])
+                ood_react_score = np.concatenate((ood_test_react_score, ood_valid_react_score))
+                np.save(f"{save_dir}/{dataset_name}_react", ood_react_score)
+        ########
+        # DICE
+        if "dice" in cfg.baselines:
+            # Inference DICE
+            rn_model = ResnetModule(arch_name=cfg.model.model_name,
+                                    input_channels=cfg.model.input_channels,
+                                    num_classes=10 if cfg.ind_dataset == "cifar10" else 43,
+                                    spectral_norm=cfg.model.spectral_norm,
+                                    dropblock=cfg.model.drop_block,
+                                    dropblock_prob=cfg.model.dropblock_prob,
+                                    dropblock_block_size=cfg.model.dropblock_block_size,
+                                    dropout=cfg.model.dropout,
+                                    dropout_prob=cfg.model.dropout_prob,
+                                    loss_fn=cfg.model.loss_type,
+                                    optimizer_lr=cfg.model.lr,
+                                    optimizer_weight_decay=cfg.model.weight_decay,
+                                    max_nro_epochs=cfg.trainer.epochs,
+                                    activation=cfg.model.activation,
+                                    avg_pool=cfg.model.avg_pool,
+                                    ash=False,
+                                    ash_percentile=cfg.ash_percentile,
+                                    dice_precompute=False,
+                                    dice_inference=True,
+                                    dice_p=cfg.dice_p,
+                                    dice_info=dice_info_mean,
+                                    react_threshold=None
+                                    )
+            rn_model.load_from_checkpoint(checkpoint_path=cfg.model_path)
+            rn_model.to(device)
+            rn_model.eval()
+            ind_valid_test_dice = []
+            for split, data_loader in ind_dataset_dict.items():
+                if not split == "train":
+                    print(f"\nDICE from InD {split}")
+                    ind_valid_test_dice.append(
+                        get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loader)
+                    )
+            ind_dice_score = np.concatenate((ind_valid_test_dice[0], ind_valid_test_dice[1]))
+            np.save(f"{save_dir}/{cfg.ind_dataset}_dice", ind_dice_score)
 
-        for dataset_name, data_loaders in ood_datasets_dict.items():
-            print(f"\nDICE from OoD {dataset_name}")
-            ood_test_dice_score = get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loaders["test"])
-            ood_valid_dice_score = get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loaders["valid"])
-            ood_dice_score = np.concatenate((ood_test_dice_score, ood_valid_dice_score))
-            np.save(f"{save_dir}/{dataset_name}_dice", ood_dice_score)
+            for dataset_name, data_loaders in ood_datasets_dict.items():
+                print(f"\nDICE from OoD {dataset_name}")
+                ood_test_dice_score = get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loaders["test"])
+                ood_valid_dice_score = get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loaders["valid"])
+                ood_dice_score = np.concatenate((ood_test_dice_score, ood_valid_dice_score))
+                np.save(f"{save_dir}/{dataset_name}_dice", ood_dice_score)
+        #########
+        # DICE + ReAct
+        if "dice_react" in cfg.baselines:
+            # Inference DICE
+            rn_model = ResnetModule(arch_name=cfg.model.model_name,
+                                    input_channels=cfg.model.input_channels,
+                                    num_classes=10 if cfg.ind_dataset == "cifar10" else 43,
+                                    spectral_norm=cfg.model.spectral_norm,
+                                    dropblock=cfg.model.drop_block,
+                                    dropblock_prob=cfg.model.dropblock_prob,
+                                    dropblock_block_size=cfg.model.dropblock_block_size,
+                                    dropout=cfg.model.dropout,
+                                    dropout_prob=cfg.model.dropout_prob,
+                                    loss_fn=cfg.model.loss_type,
+                                    optimizer_lr=cfg.model.lr,
+                                    optimizer_weight_decay=cfg.model.weight_decay,
+                                    max_nro_epochs=cfg.trainer.epochs,
+                                    activation=cfg.model.activation,
+                                    avg_pool=cfg.model.avg_pool,
+                                    ash=False,
+                                    ash_percentile=cfg.ash_percentile,
+                                    dice_precompute=False,
+                                    dice_inference=True,
+                                    dice_p=cfg.dice_p,
+                                    dice_info=dice_info_mean,
+                                    react_threshold=react_threshold
+                                    )
+            rn_model.load_from_checkpoint(checkpoint_path=cfg.model_path)
+            rn_model.to(device)
+            rn_model.eval()
+            ind_valid_test_dice_react = []
+            for split, data_loader in ind_dataset_dict.items():
+                if not split == "train":
+                    print(f"\nDICE + ReAct from InD {split}")
+                    ind_valid_test_dice_react.append(
+                        get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loader)
+                    )
+            ind_dice_react_score = np.concatenate((ind_valid_test_dice_react[0], ind_valid_test_dice_react[1]))
+            np.save(f"{save_dir}/{cfg.ind_dataset}_dice_react", ind_dice_react_score)
+
+            for dataset_name, data_loaders in ood_datasets_dict.items():
+                print(f"\nDICE + ReAct from OoD {dataset_name}")
+                ood_test_dice_react_score = get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loaders["test"])
+                ood_valid_dice_react_score = get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loaders["valid"])
+                ood_dice_react_score = np.concatenate((ood_test_dice_react_score, ood_valid_dice_react_score))
+                np.save(f"{save_dir}/{dataset_name}_dice_react", ood_dice_react_score)
 
     print("Done!")
 

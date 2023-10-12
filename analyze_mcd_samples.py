@@ -338,6 +338,16 @@ baseline_name_dict = {
         "plot_title": "DICE score distribution",
         "x_axis": "DICE score",
         "plot_name": "dice_score"
+    },
+    "react": {
+        "plot_title": "ReAct score distribution",
+        "x_axis": "ReAct score",
+        "plot_name": "react_score"
+    },
+    "dice_react": {
+        "plot_title": "DICE + ReAct score distribution",
+        "x_axis": "DICE + ReAct score",
+        "plot_name": "dice_react_score"
     }
 }
 
