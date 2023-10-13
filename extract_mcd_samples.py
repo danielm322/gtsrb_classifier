@@ -28,13 +28,18 @@ fmnist_data_dir = "./data/fmnist-data"
 svhn_data_dir = './data/svhn-data/'
 places_data_dir = "./data/places-data"
 textures_data_dir = "./data/textures-data"
-lsun_data_dir = "./data/lsun-data"
+lsun_c_data_dir = "./data/LSUN"
+lsun_r_data_dir = "./data/LSUN_resize"
+isun_data_dir = "./data/iSUN"
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 N_WORKERS = os.cpu_count() - 4 if os.cpu_count() >= 8 else os.cpu_count() - 2
 CIFAR10_TEST_SIZE = 0.5  # From test size 10000 default:0.5
 FMNIST_TEST_SIZE = 0.5  # From test size 10000 default:0.5
 SVHN_TEST_SIZE = 0.2  # From test size 26000 default:0.2
 PLACES_TEST_SIZE = 0.14  # From test size 36500 default:0.14
+LSUN_C_TEST_SIZE = 0.5  # From test size 10000 default:0.5
+LSUN_R_TEST_SIZE = 0.5  # From test size 10000 default:0.5
+iSUN_TEST_SIZE = 0.56  # From test size 8925 default:0.56
 EXTRACT_MCD_SAMPLES_AND_ENTROPIES = True  # set False for debugging purposes
 EXTRACT_IND = True
 
@@ -402,8 +407,75 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
             "valid": DataLoader(textures_val, batch_size=1, shuffle=True),
             "test": DataLoader(textures_test, batch_size=1, shuffle=True)
         }
-        # del textures_init_valid
 
+    ##########################################################
+    # LSUN-Crop OoD
+    ##########################################################
+    if "lsun_c" in cfg.ood_datasets and cfg.ind_dataset == "cifar10":
+        print("LSUN-C as OoD")
+        lsun_c_init_test = torchvision.datasets.ImageFolder(lsun_c_data_dir, transform=test_transforms)
+        lsun_c_test_subset = torch.utils.data.random_split(
+            lsun_c_init_test,
+            [int(len(lsun_c_init_test) * LSUN_C_TEST_SIZE),
+             int(len(lsun_c_init_test) * (1.0 - LSUN_C_TEST_SIZE))],
+            torch.Generator().manual_seed(cfg.seed)
+        )[0]
+        lsun_c_test_subset, lsun_c_valid_subset = torch.utils.data.random_split(
+            lsun_c_test_subset,
+            [int(len(lsun_c_test_subset) * 0.5), int(len(lsun_c_test_subset) * 0.5)],
+            torch.Generator().manual_seed(cfg.seed)
+        )
+        ood_datasets_dict["lsun_c"] = {
+            "valid": DataLoader(lsun_c_valid_subset, batch_size=1, shuffle=True),
+            "test": DataLoader(lsun_c_test_subset, batch_size=1, shuffle=True),
+        }
+        del lsun_c_init_test
+
+    ##########################################################
+    # LSUN-Resize OoD
+    ##########################################################
+    if "lsun_r" in cfg.ood_datasets and cfg.ind_dataset == "cifar10":
+        print("LSUN-R as OoD")
+        lsun_r_init_test = torchvision.datasets.ImageFolder(lsun_r_data_dir, transform=test_transforms)
+        lsun_r_test_subset = torch.utils.data.random_split(
+            lsun_r_init_test,
+            [int(len(lsun_r_init_test) * LSUN_R_TEST_SIZE),
+             int(len(lsun_r_init_test) * (1.0 - LSUN_R_TEST_SIZE))],
+            torch.Generator().manual_seed(cfg.seed)
+        )[0]
+        lsun_r_test_subset, lsun_r_valid_subset = torch.utils.data.random_split(
+            lsun_r_test_subset,
+            [int(len(lsun_r_test_subset) * 0.5), int(len(lsun_r_test_subset) * 0.5)],
+            torch.Generator().manual_seed(cfg.seed)
+        )
+        ood_datasets_dict["lsun_r"] = {
+            "valid": DataLoader(lsun_r_valid_subset, batch_size=1, shuffle=True),
+            "test": DataLoader(lsun_r_test_subset, batch_size=1, shuffle=True),
+        }
+        del lsun_r_init_test
+
+    ##########################################################
+    # iSUN OoD
+    ##########################################################
+    if "isun" in cfg.ood_datasets and cfg.ind_dataset == "cifar10":
+        print("iSUN as OoD")
+        isun_init_test = torchvision.datasets.ImageFolder(isun_data_dir, transform=test_transforms)
+        isun_test_subset = torch.utils.data.random_split(
+            isun_init_test,
+            [int(len(isun_init_test) * iSUN_TEST_SIZE),
+             len(isun_init_test) -  (int(len(isun_init_test) * iSUN_TEST_SIZE))],
+            torch.Generator().manual_seed(cfg.seed)
+        )[0]
+        isun_test_subset, isun_valid_subset = torch.utils.data.random_split(
+            isun_test_subset,
+            [int(len(isun_test_subset) * 0.5), int(len(isun_test_subset) * 0.5)],
+            torch.Generator().manual_seed(cfg.seed)
+        )
+        ood_datasets_dict["isun"] = {
+            "valid": DataLoader(isun_valid_subset, batch_size=1, shuffle=True),
+            "test": DataLoader(isun_test_subset, batch_size=1, shuffle=True),
+        }
+        del isun_init_test
     ####################################################################
     # Load trained model
     ####################################################################
