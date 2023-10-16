@@ -23,6 +23,7 @@ from datetime import datetime
 def main(cfg: DictConfig) -> None:
     assert cfg.ind_dataset in ("gtsrb", "cifar10")
     assert cfg.ind_dataset in cfg.data_dir
+    assert cfg.model.spectral_norm_only_fc + cfg.model.spectral_norm <= 1
     #####################
     #      Get Args     #
     #####################
@@ -134,7 +135,8 @@ def main(cfg: DictConfig) -> None:
                                 dice_inference=False,
                                 dice_p=cfg.dice_p,
                                 dice_info=None,
-                                react_threshold=None
+                                react_threshold=None,
+                                spectral_norm_only_fc=cfg.model.spectral_norm_only_fc
                                 )
 
     ########################################

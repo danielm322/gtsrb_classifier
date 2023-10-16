@@ -264,7 +264,8 @@ class ResNet(nn.Module):
             dice_inference: bool = False,
             dice_p: int = 90,
             dice_info: Union[None, array] = None,
-            react_threshold: Union[None, float] = None
+            react_threshold: Union[None, float] = None,
+            spectral_norm_only_fc: bool = False,
     ) -> None:
         super().__init__()
         assert activation in ("relu", "leaky")
@@ -278,6 +279,7 @@ class ResNet(nn.Module):
         self.dice_inference = dice_inference
         self.dice_p = dice_p
         self.react_threshold = react_threshold
+        self.spectral_norm_only_fc = spectral_norm_only_fc
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
@@ -328,10 +330,16 @@ class ResNet(nn.Module):
             #     )
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        if self.dice_inference:
-            self.fc = RouteDICE(512 * block.expansion, num_classes, p=self.dice_p, info=dice_info)
+        if self.spectral_norm_only_fc:
+            if self.dice_inference:
+                self.fc = spectral_norm(RouteDICE(512 * block.expansion, num_classes, p=self.dice_p, info=dice_info))
+            else:
+                self.fc = spectral_norm(nn.Linear(512 * block.expansion, num_classes))
         else:
-            self.fc = nn.Linear(512 * block.expansion, num_classes)
+            if self.dice_inference:
+                self.fc = RouteDICE(512 * block.expansion, num_classes, p=self.dice_p, info=dice_info)
+            else:
+                self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         if self.dropout:
             self.dropout_layer = nn.Dropout(p=self.dropout_prob)
@@ -543,6 +551,7 @@ def _resnet(arch_name: str,
             react_threshold: Union[None, float] = None,
             pretrained: bool = False,
             progress: bool = True,
+            spectral_norm_only_fc: bool = False,
             **kwargs):
     if not spectral_norm:
         model = ResNet(block,
@@ -563,6 +572,7 @@ def _resnet(arch_name: str,
                        dice_p=dice_p,
                        dice_info=dice_info,
                        react_threshold=react_threshold,
+                       spectral_norm_only_fc=spectral_norm_only_fc,
                        **kwargs)
     else:
         model = ResNetSN(block,
@@ -610,6 +620,7 @@ def resnet18(input_channels=3,
              dice_p=90,
              dice_info=None,
              react_threshold=None,
+             spectral_norm_only_fc=False,
              **kwargs):
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -639,6 +650,7 @@ def resnet18(input_channels=3,
                    react_threshold,
                    pretrained,
                    progress,
+                   spectral_norm_only_fc,
                    **kwargs)
 
 

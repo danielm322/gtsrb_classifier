@@ -46,6 +46,7 @@ EXTRACT_IND = True
 
 @hydra.main(version_base=None, config_path="configs", config_name="config.yaml")
 def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
+    assert cfg.model.spectral_norm_only_fc + cfg.model.spectral_norm <= 1
     ################################################################################################
     #                                 LOAD DATASETS                                   ##############
     ################################################################################################
@@ -597,28 +598,29 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
     #######################
     # Maximum softmax probability and energy scores calculations
     rn_model.eval()  # No MCD needed here
-    # InD data
-    ind_valid_test_msp = []
-    ind_valid_test_energy = []
-    for split, data_loader in ind_dataset_dict.items():
-        if not split == "train":
-            print(f"\nMsp and energy from InD {split}")
-            if "msp" in cfg.baselines:
-                ind_valid_test_msp.append(
-                    get_msp_score(dnn_model=rn_model.model, input_dataloader=data_loader)
-                )
-            if "energy" in cfg.baselines:
-                ind_valid_test_energy.append(
-                    get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loader)
-                )
+    if EXTRACT_IND:
+        # InD data
+        ind_valid_test_msp = []
+        ind_valid_test_energy = []
+        for split, data_loader in ind_dataset_dict.items():
+            if not split == "train":
+                print(f"\nMsp and energy from InD {split}")
+                if "msp" in cfg.baselines:
+                    ind_valid_test_msp.append(
+                        get_msp_score(dnn_model=rn_model.model, input_dataloader=data_loader)
+                    )
+                if "energy" in cfg.baselines:
+                    ind_valid_test_energy.append(
+                        get_energy_score(dnn_model=rn_model.model, input_dataloader=data_loader)
+                    )
 
-    # Concatenate
-    if "msp" in cfg.baselines:
-        ind_msp_score = np.concatenate((ind_valid_test_msp[0], ind_valid_test_msp[1]))
-        np.save(f"{save_dir}/{cfg.ind_dataset}_msp", ind_msp_score)
-    if "energy" in cfg.baselines:
-        ind_energy_score = np.concatenate((ind_valid_test_energy[0], ind_valid_test_energy[1]))
-        np.save(f"{save_dir}/{cfg.ind_dataset}_energy", ind_energy_score)
+        # Concatenate
+        if "msp" in cfg.baselines:
+            ind_msp_score = np.concatenate((ind_valid_test_msp[0], ind_valid_test_msp[1]))
+            np.save(f"{save_dir}/{cfg.ind_dataset}_msp", ind_msp_score)
+        if "energy" in cfg.baselines:
+            ind_energy_score = np.concatenate((ind_valid_test_energy[0], ind_valid_test_energy[1]))
+            np.save(f"{save_dir}/{cfg.ind_dataset}_energy", ind_energy_score)
 
     for dataset_name, data_loaders in ood_datasets_dict.items():
         print(f"\nmsp and energy from OoD {dataset_name}")
@@ -668,6 +670,28 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
     if "knn" in cfg.baselines:
         ind_knn_score = np.concatenate((ind_valid_test_knn[0], ind_valid_test_knn[1]))
         np.save(f"{save_dir}/{cfg.ind_dataset}_knn", ind_knn_score)
+    if EXTRACT_IND:
+        # InD samples
+        ind_valid_test_mdist = []
+        ind_valid_test_knn = []
+        for split, data_loader in ind_dataset_dict.items():
+            if not split == "train":
+                print(f"\nMdist and kNN from InD {split}")
+                if "mdist" in cfg.baselines:
+                    ind_valid_test_mdist.append(
+                        m_dist_estimator.postprocess(rn_model.model, data_loader, gtsrb_model_avgpool_layer_hook)[1]
+                    )
+                if "knn" in cfg.baselines:
+                    ind_valid_test_knn.append(
+                        knn_dist_estimator.postprocess(rn_model.model, data_loader, gtsrb_model_avgpool_layer_hook)[1]
+                    )
+        if "mdist" in cfg.baselines:
+            # Concatenate ind samples
+            ind_mdist_score = np.concatenate((ind_valid_test_mdist[0], ind_valid_test_mdist[1]))
+            np.save(f"{save_dir}/{cfg.ind_dataset}_mdist", ind_mdist_score)
+        if "knn" in cfg.baselines:
+            ind_knn_score = np.concatenate((ind_valid_test_knn[0], ind_valid_test_knn[1]))
+            np.save(f"{save_dir}/{cfg.ind_dataset}_knn", ind_knn_score)
     # OoD samples
     for dataset_name, data_loaders in ood_datasets_dict.items():
         print(f"\nMdist and kNN from OoD {dataset_name}")
@@ -754,7 +778,8 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
                                     dice_inference=False,
                                     dice_p=cfg.dice_p,
                                     dice_info=None,
-                                    react_threshold=react_threshold
+                                    react_threshold=react_threshold,
+                                    spectral_norm_only_fc=cfg.model.spectral_norm_only_fc
                                     )
             rn_model.load_from_checkpoint(checkpoint_path=cfg.model_path)
             rn_model.to(device)
@@ -801,7 +826,8 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
                                     dice_inference=True,
                                     dice_p=cfg.dice_p,
                                     dice_info=dice_info_mean,
-                                    react_threshold=None
+                                    react_threshold=None,
+                                    spectral_norm_only_fc=cfg.model.spectral_norm_only_fc
                                     )
             rn_model.load_from_checkpoint(checkpoint_path=cfg.model_path)
             rn_model.to(device)
@@ -847,7 +873,8 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
                                     dice_inference=True,
                                     dice_p=cfg.dice_p,
                                     dice_info=dice_info_mean,
-                                    react_threshold=react_threshold
+                                    react_threshold=react_threshold,
+                                    spectral_norm_only_fc=cfg.model.spectral_norm_only_fc
                                     )
             rn_model.load_from_checkpoint(checkpoint_path=cfg.model_path)
             rn_model.to(device)
