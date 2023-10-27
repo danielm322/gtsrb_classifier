@@ -552,6 +552,7 @@ def _resnet(arch_name: str,
             pretrained: bool = False,
             progress: bool = True,
             spectral_norm_only_fc: bool = False,
+            batch_norm: bool = True,
             **kwargs):
     if not spectral_norm:
         model = ResNet(block,
@@ -573,6 +574,7 @@ def _resnet(arch_name: str,
                        dice_info=dice_info,
                        react_threshold=react_threshold,
                        spectral_norm_only_fc=spectral_norm_only_fc,
+                       norm_layer=None if batch_norm else nn.Identity,
                        **kwargs)
     else:
         model = ResNetSN(block,
@@ -621,6 +623,7 @@ def resnet18(input_channels=3,
              dice_info=None,
              react_threshold=None,
              spectral_norm_only_fc=False,
+             batch_norm=True,
              **kwargs):
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -651,6 +654,7 @@ def resnet18(input_channels=3,
                    pretrained,
                    progress,
                    spectral_norm_only_fc,
+                   batch_norm,
                    **kwargs)
 
 

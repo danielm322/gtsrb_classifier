@@ -16,7 +16,7 @@ class ResnetModule(pl.LightningModule):
 
     """
     def __init__(self,
-                 arch_name :str = 'resnet18',
+                 arch_name: str = 'resnet18',
                  input_channels: int = 3,
                  num_classes: int = 43,
                  spectral_norm: bool = False,
@@ -38,7 +38,8 @@ class ResnetModule(pl.LightningModule):
                  dice_p: int = 90,
                  dice_info: Union[None, array] = None,
                  react_threshold: Union[None, float] = None,
-                 spectral_norm_only_fc: bool = False) -> None:
+                 spectral_norm_only_fc: bool = False,
+                 batch_norm: bool = True) -> None:
         super().__init__()
         
         if arch_name not in ["resnet18","resnet34", "resnet50", "resnet101", "resnet152"]:
@@ -79,7 +80,8 @@ class ResnetModule(pl.LightningModule):
                               dice_p=dice_p,
                               dice_info=dice_info,
                               react_threshold=react_threshold,
-                              spectral_norm_only_fc=spectral_norm_only_fc)
+                              spectral_norm_only_fc=spectral_norm_only_fc,
+                              batch_norm=batch_norm)
         # add Accuracy Metric
         self.metric_accuracy = torchmetrics.Accuracy(num_classes=self.num_classes)
         
