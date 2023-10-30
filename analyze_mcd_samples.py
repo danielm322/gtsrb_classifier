@@ -9,7 +9,8 @@ from tqdm import tqdm
 from helper_functions import log_params_from_omegaconf_dict
 from ls_ood_detect_cea.uncertainty_estimation import get_predictive_uncertainty_score
 from ls_ood_detect_cea.metrics import get_hz_detector_results, \
-    save_roc_ood_detector, save_scores_plots, get_pred_scores_plots, log_evaluate_lared_larem
+    save_roc_ood_detector, save_scores_plots, get_pred_scores_plots, log_evaluate_lared_larem, \
+    select_and_log_best_lared_larem
 from ls_ood_detect_cea import apply_pca_ds_split, apply_pca_transform
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -294,6 +295,26 @@ def main(cfg: DictConfig) -> None:
             # Log the plot with mlflow
             mlflow.log_figure(figure=roc_curve_pca_lared,
                               artifact_file=f"figs/roc_{ood_dataset}_pca_lared.png")
+
+        # Extract mean for each baseline across datasets
+        for baseline in all_baselines:
+            temp_df = pd.DataFrame(columns=['auroc', 'fpr@95', 'aupr',
+                                            'fpr', 'tpr', 'roc_thresholds',
+                                            'precision', 'recall', 'pr_thresholds'])
+            for row_name in overall_metrics_df.index:
+                if baseline in row_name and "anomalies" not in row_name:
+                    temp_df = temp_df.append(overall_metrics_df.loc[row_name])
+                    temp_df.rename(index={row_name: row_name.split(baseline)[0]}, inplace=True)
+
+            mlflow.log_metric(f"{baseline}_auroc_mean", temp_df["auroc"].mean())
+            mlflow.log_metric(f"{baseline}_aupr_mean", temp_df["aupr"].mean())
+            mlflow.log_metric(f"{baseline}_fpr95_mean", temp_df["fpr@95"].mean())
+
+        # Extract mean for LaRED & LaREM across datasets
+        # LaRED
+        select_and_log_best_lared_larem(overall_metrics_df, cfg.n_pca_components, technique="LaRED")
+        # LaREM
+        select_and_log_best_lared_larem(overall_metrics_df, cfg.n_pca_components, technique="LaREM")
 
         mlflow.end_run()
 
