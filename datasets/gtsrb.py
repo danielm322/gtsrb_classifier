@@ -1,6 +1,7 @@
 from typing import Tuple, List, Any, Optional, Callable
 import os
 import matplotlib.pyplot as plt
+import torchvision
 from PIL import Image
 import numpy as np
 import torch
@@ -660,3 +661,22 @@ class GtsrbModule(LightningDataModule):
             plt.show()
         else:
             return im
+
+
+def fmnist_to_gtsrb_format(img_size: int, gtsrb_normalize: bool):
+    if gtsrb_normalize:
+        return torchvision.transforms.Compose([
+            torchvision.transforms.Resize(size=(img_size, img_size)),
+            torchvision.transforms.Grayscale(num_output_channels=3),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize(
+                mean=[0.3337, 0.3064, 0.3171],
+                std=[0.2672, 0.2564, 0.2629]
+            ),
+        ])
+    else:
+        return torchvision.transforms.Compose([
+            torchvision.transforms.Resize(size=(img_size, img_size)),
+            torchvision.transforms.Grayscale(num_output_channels=3),
+            torchvision.transforms.ToTensor(),
+        ])

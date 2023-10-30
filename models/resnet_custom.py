@@ -595,6 +595,7 @@ def _resnet(arch_name: str,
                          dice_p=dice_p,
                          dice_info=dice_info,
                          react_threshold=react_threshold,
+                         norm_layer=None if batch_norm else nn.Identity,
                          **kwargs)
 
     if pretrained:
