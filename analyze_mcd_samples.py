@@ -212,7 +212,8 @@ def main(cfg: DictConfig) -> None:
             ind_test_h_z=ind_data_dict["h_z"],
             ood_h_z_dict=ood_entropies_dict,
             experiment_name_extension="",
-            return_density_scores=True
+            return_density_scores=True,
+            mlflow_logging=True
         )
         # Add results to df
         overall_metrics_df = overall_metrics_df.append(r_df)
@@ -243,7 +244,8 @@ def main(cfg: DictConfig) -> None:
                 ood_h_z_dict=ood_pca_dict,
                 experiment_name_extension=f" PCA {n_components}",
                 return_density_scores=False,
-                log_step=n_components
+                log_step=n_components,
+                mlflow_logging=True
             )
             # Add results to df
             overall_metrics_df = overall_metrics_df.append(r_df)
