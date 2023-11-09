@@ -12,7 +12,7 @@ from pl_bolts.datamodules import STL10DataModule
 from .cifar10 import get_cifar10_input_transformations, fmnist_to_cifar_format
 
 
-def get_data_loaders_image_classification(cfg, datasets_paths, datasets_test_sizes, n_workers):
+def get_data_loaders_image_classification(cfg, datasets_paths, n_workers):
     ##################################################################
     # GTSRB NORMAL DATASET
     ###################################################################
@@ -143,8 +143,8 @@ def get_data_loaders_image_classification(cfg, datasets_paths, datasets_test_siz
         # validation and test set
         cifar10_test_subset = torch.utils.data.random_split(
             cifar10_dm.dataset_test,
-            [int(len(cifar10_dm.dataset_test) * datasets_test_sizes["cifar10"]),
-             int(len(cifar10_dm.dataset_test) * (1.0 - datasets_test_sizes["cifar10"]))],
+            [int(len(cifar10_dm.dataset_test) * cfg.datasets_sizes.cifar10),
+             int(len(cifar10_dm.dataset_test) * (1.0 - cfg.datasets_sizes.cifar10))],
             torch.Generator().manual_seed(cfg.seed)
         )[0]
         cifar10_test_subset, cifar10_valid_subset = torch.utils.data.random_split(
@@ -206,8 +206,8 @@ def get_data_loaders_image_classification(cfg, datasets_paths, datasets_test_siz
         # Subset the test dataset
         cifar10_anomal_test_subset = torch.utils.data.random_split(
             cifar10_anomal_dm.dataset_test,
-            [int(len(cifar10_anomal_dm.dataset_test) * datasets_test_sizes["cifar10"]),
-             int(len(cifar10_anomal_dm.dataset_test) * (1.0 - datasets_test_sizes["cifar10"]))],
+            [int(len(cifar10_anomal_dm.dataset_test) * cfg.datasets_sizes.cifar10),
+             int(len(cifar10_anomal_dm.dataset_test) * (1.0 - cfg.datasets_sizes.cifar10))],
             torch.Generator().manual_seed(cfg.seed)
         )[0]
         cifar10_anomal_test_subset, cifar10_anomal_valid_subset = torch.utils.data.random_split(
@@ -270,8 +270,8 @@ def get_data_loaders_image_classification(cfg, datasets_paths, datasets_test_siz
         fmnist_dm.setup(stage='fit')
         fmnist_dm.setup(stage='test')
         # Subset test dataset
-        fmnist_test_size = int((datasets_test_sizes["fmnist"] / 2) * len(fmnist_dm.dataset_test))
-        fmnist_valid_size = int((datasets_test_sizes["fmnist"] / 2) * len(fmnist_dm.dataset_test))
+        fmnist_test_size = int((cfg.datasets_sizes.fmnist / 2) * len(fmnist_dm.dataset_test))
+        fmnist_valid_size = int((cfg.datasets_sizes.fmnist / 2) * len(fmnist_dm.dataset_test))
         fmnist_test = torch.utils.data.random_split(
             fmnist_dm.dataset_test,
             [len(fmnist_dm.dataset_test) - fmnist_test_size - fmnist_valid_size,
@@ -299,8 +299,8 @@ def get_data_loaders_image_classification(cfg, datasets_paths, datasets_test_siz
             download=True,
             transform=test_transforms
         )
-        svhn_test_size = int((datasets_test_sizes["svhn"] / 2) * len(svhn_init_valid))
-        svhn_valid_size = int((datasets_test_sizes["svhn"] / 2) * len(svhn_init_valid))
+        svhn_test_size = int((cfg.datasets_sizes.svhn / 2) * len(svhn_init_valid))
+        svhn_valid_size = int((cfg.datasets_sizes.svhn / 2) * len(svhn_init_valid))
         svhn_test = torch.utils.data.random_split(
             svhn_init_valid,
             [len(svhn_init_valid) - svhn_valid_size - svhn_test_size, svhn_test_size + svhn_valid_size],
@@ -327,7 +327,7 @@ def get_data_loaders_image_classification(cfg, datasets_paths, datasets_test_siz
                                                            small=True,
                                                            download=False,
                                                            transform=test_transforms, )
-        places_test_size = int((datasets_test_sizes["places"] / 2) * len(places_init_valid))
+        places_test_size = int((cfg.datasets_sizes.places / 2) * len(places_init_valid))
         places_test = torch.utils.data.random_split(
             places_init_valid,
             [len(places_init_valid) - 2 * places_test_size, 2 * places_test_size],
@@ -377,8 +377,8 @@ def get_data_loaders_image_classification(cfg, datasets_paths, datasets_test_siz
         lsun_c_init_test = torchvision.datasets.ImageFolder(datasets_paths["lsun_c"], transform=test_transforms)
         lsun_c_test_subset = torch.utils.data.random_split(
             lsun_c_init_test,
-            [int(len(lsun_c_init_test) * datasets_test_sizes["lsun_c"]),
-             int(len(lsun_c_init_test) * (1.0 - datasets_test_sizes["lsun_c"]))],
+            [int(len(lsun_c_init_test) * cfg.datasets_sizes.lsun_c),
+             int(len(lsun_c_init_test) * (1.0 - cfg.datasets_sizes.lsun_c))],
             torch.Generator().manual_seed(cfg.seed)
         )[0]
         lsun_c_test_subset, lsun_c_valid_subset = torch.utils.data.random_split(
@@ -400,8 +400,8 @@ def get_data_loaders_image_classification(cfg, datasets_paths, datasets_test_siz
         lsun_r_init_test = torchvision.datasets.ImageFolder(datasets_paths["lsun_r"], transform=test_transforms)
         lsun_r_test_subset = torch.utils.data.random_split(
             lsun_r_init_test,
-            [int(len(lsun_r_init_test) * datasets_test_sizes["lsun_r"]),
-             int(len(lsun_r_init_test) * (1.0 - datasets_test_sizes["lsun_r"]))],
+            [int(len(lsun_r_init_test) * cfg.datasets_sizes.lsun_r),
+             int(len(lsun_r_init_test) * (1.0 - cfg.datasets_sizes.lsun_r))],
             torch.Generator().manual_seed(cfg.seed)
         )[0]
         lsun_r_test_subset, lsun_r_valid_subset = torch.utils.data.random_split(
@@ -423,13 +423,13 @@ def get_data_loaders_image_classification(cfg, datasets_paths, datasets_test_siz
         isun_init_test = torchvision.datasets.ImageFolder(datasets_paths["isun"], transform=test_transforms)
         isun_test_subset = torch.utils.data.random_split(
             isun_init_test,
-            [int(len(isun_init_test) * datasets_test_sizes["isun"]),
-             len(isun_init_test) - (int(len(isun_init_test) * datasets_test_sizes["isun"]))],
+            [int(len(isun_init_test) * cfg.datasets_sizes.isun),
+             len(isun_init_test) - (int(len(isun_init_test) * cfg.datasets_sizes.isun))],
             torch.Generator().manual_seed(cfg.seed)
         )[0]
         isun_test_subset, isun_valid_subset = torch.utils.data.random_split(
             isun_test_subset,
-            [int(len(isun_test_subset) * 0.5), int(len(isun_test_subset) * 0.5)],
+            [int(len(isun_test_subset) * 0.5), len(isun_test_subset) - int(len(isun_test_subset) * 0.5)],
             torch.Generator().manual_seed(cfg.seed)
         )
         ood_datasets_dict["isun"] = {

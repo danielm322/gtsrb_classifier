@@ -253,6 +253,10 @@ def main(cfg: DictConfig) -> None:
         overall_metrics_df_name = f"./results_csvs/{current_date}_experiment.csv.gz"
         overall_metrics_df.to_csv(path_or_buf=overall_metrics_df_name, compression="gzip")
         mlflow.log_artifact(overall_metrics_df_name)
+        if cfg.layer_type == "Conv":
+            hook_layer_type = "DropBlock"
+        else:
+            hook_layer_type = "Dropout"
 
         # Plot Roc curves together, by OoD dataset
         for ood_dataset in cfg.ood_datasets:
@@ -278,14 +282,14 @@ def main(cfg: DictConfig) -> None:
             # Plot ROC curve
             roc_curve = save_roc_ood_detector(
                 results_table=temp_df,
-                plot_title=f"ROC {cfg.ind_dataset} vs {ood_dataset} {cfg.layer_type} layer"
+                plot_title=f"ROC {cfg.ind_dataset} vs {ood_dataset} {hook_layer_type} layer"
             )
             # Log the plot with mlflow
             mlflow.log_figure(figure=roc_curve,
                               artifact_file=f"figs/roc_{ood_dataset}.png")
             roc_curve_pca_larem = save_roc_ood_detector(
                 results_table=temp_df_pca_larem,
-                plot_title=f"ROC {cfg.ind_dataset} vs {ood_dataset} LareM PCA {cfg.layer_type} layer"
+                plot_title=f"ROC {cfg.ind_dataset} vs {ood_dataset} LareM PCA {hook_layer_type} layer"
             )
             # Log the plot with mlflow
             mlflow.log_figure(figure=roc_curve_pca_larem,
@@ -309,8 +313,11 @@ def main(cfg: DictConfig) -> None:
                     temp_df.rename(index={row_name: row_name.split(baseline)[0]}, inplace=True)
 
             mlflow.log_metric(f"{baseline}_auroc_mean", temp_df["auroc"].mean())
+            mlflow.log_metric(f"{baseline}_auroc_std", temp_df["auroc"].std())
             mlflow.log_metric(f"{baseline}_aupr_mean", temp_df["aupr"].mean())
+            mlflow.log_metric(f"{baseline}_aupr_std", temp_df["aupr"].std())
             mlflow.log_metric(f"{baseline}_fpr95_mean", temp_df["fpr@95"].mean())
+            mlflow.log_metric(f"{baseline}_fpr95_std", temp_df["fpr@95"].std())
 
         # Extract mean for LaRED & LaREM across datasets
         # LaRED

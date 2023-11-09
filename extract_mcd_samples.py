@@ -24,19 +24,10 @@ datasets_paths_dict = {
     "lsun_r": "./data/LSUN_resize",
     "isun": "./data/iSUN"
 }
-datasets_test_sizes_dict = {
-    "cifar10": 0.5,  # From test size 10000 default:0.5
-    "fmnist": 0.5,  # From test size 10000 default:0.5
-    "svhn": 0.2,  # From test size 26000 default:0.2
-    "places": 0.14,  # From test size 36500 default:0.14
-    "lsun_c": 0.5,  # From test size 10000 default:0.5
-    "lsun_r": 0.5,  # From test size 10000 default:0.5
-    "isun": 0.56  # From test size 8925 default:0.56
-}
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 N_WORKERS = os.cpu_count() - 4 if os.cpu_count() >= 8 else os.cpu_count() - 2
-EXTRACT_MCD_SAMPLES_AND_ENTROPIES = False  # set False for debugging purposes
-EXTRACT_IND = False
+EXTRACT_MCD_SAMPLES_AND_ENTROPIES = True  # set False for debugging purposes
+EXTRACT_IND = True
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="config.yaml")
@@ -48,7 +39,6 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
     ind_dataset_dict, ood_datasets_dict = get_data_loaders_image_classification(
         cfg=cfg,
         datasets_paths=datasets_paths_dict,
-        datasets_test_sizes=datasets_test_sizes_dict,
         n_workers=N_WORKERS
     )
 
