@@ -342,8 +342,11 @@ def main(cfg: DictConfig) -> None:
         all_auprs.append(aupr_larem)
         all_fprs.append(fpr_larem)
         mlflow.log_metric(f"global_auroc_mean", np.mean(all_aurocs))
+        mlflow.log_metric(f"global_auroc_std", np.std(all_aurocs))
         mlflow.log_metric(f"global_aupr_mean", np.mean(all_auprs))
+        mlflow.log_metric(f"global_aupr_std", np.std(all_auprs))
         mlflow.log_metric(f"global_fpr_mean", np.mean(all_fprs))
+        mlflow.log_metric(f"global_fpr_std", np.std(all_fprs))
 
         mlflow.end_run()
 
