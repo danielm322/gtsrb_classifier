@@ -41,6 +41,7 @@ def main(cfg: DictConfig) -> None:
 
     print(' ')
     print('=' * 60)
+    ic(current_date_time)
     ic(model_type)
     ic(max_nro_epochs)
     ic(batch_size)
