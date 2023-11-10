@@ -253,6 +253,7 @@ class ResNet(nn.Module):
             norm_layer: Optional[Callable[..., nn.Module]] = None,
             dropblock: bool = False,
             dropblock_prob: float = 0.0,
+            dropblock_location: int = 2,
             dropblock_block_size: int = 3,
             dropout: bool = False,
             dropout_prob: float = 0.0,
@@ -269,6 +270,7 @@ class ResNet(nn.Module):
     ) -> None:
         super().__init__()
         assert activation in ("relu", "leaky")
+        assert dropblock_location in (1, 2, 3)
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
@@ -296,6 +298,7 @@ class ResNet(nn.Module):
         self.input_channels = input_channels
         self.dropblock = dropblock
         self.dropblock_prob = dropblock_prob
+        self.dropblock_location = dropblock_location
         self.dropblock_block_size = dropblock_block_size
         self.dropout = dropout
         self.dropout_prob = dropout_prob
@@ -318,16 +321,6 @@ class ResNet(nn.Module):
         if self.dropblock:
             self.dropblock2d_layer = DropBlock2D(drop_prob=self.dropblock_prob,
                                                  block_size=self.dropblock_block_size)
-            # self.dropblock2d_layer_1 = DropBlock2D(drop_prob=0.4,
-            #                                        block_size=10)
-            # self.dropblock2d_layer_2 = DropBlock2D(drop_prob=self.dropblock_prob,
-            #                                        block_size=self.dropblock_block_size)
-            # self.dropblock2d = LinearScheduler(
-            #         DropBlock2D(drop_prob=self.dropblock_prob, block_size=2),
-            #         start_value=0.0,
-            #         stop_value=self.dropblock_prob,
-            #         nr_steps=int(25e3)
-            #     )
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         if self.spectral_norm_only_fc:
@@ -417,15 +410,16 @@ class ResNet(nn.Module):
 
         x1 = self.layer1(x)
         # ic(x1.shape)
-        # if self.dropblock:
-        #     x1 = self.dropblock2d_layer_1(x1)
+        if self.dropblock and self.dropblock_location == 1:
+            x1 = self.dropblock2d_layer(x1)
         x2 = self.layer2(x1)
         # ic(x2.shape)
-        if self.dropblock:
+        if self.dropblock and self.dropblock_location == 2:
             x2 = self.dropblock2d_layer(x2)
-            # x2 = self.dropblock2d_layer_2(x2)
             # ic("x2 drop", x2.shape)
         x3 = self.layer3(x2)
+        if self.dropblock and self.dropblock_location == 3:
+            x3 = self.dropblock2d_layer(x3)
         # ic(x3.shape)
         x4 = self.layer4(x3)
         # ic(x4.shape)
@@ -464,6 +458,7 @@ class ResNetSN(ResNet):
                  norm_layer: Optional[Callable[..., nn.Module]] = None,
                  dropblock: bool = False,
                  dropblock_prob: float = 0.0,
+                 dropblock_location: int = 2,
                  dropblock_block_size: int = 3,
                  dropout: bool = False,
                  dropout_prob: float = 0.0,
@@ -487,6 +482,7 @@ class ResNetSN(ResNet):
                          norm_layer,
                          dropblock,
                          dropblock_prob,
+                         dropblock_location,
                          dropblock_block_size,
                          dropout,
                          dropout_prob,
@@ -536,6 +532,7 @@ def _resnet(arch_name: str,
             num_classes: int = 1000,  # ImageNet-1000
             dropblock: bool = False,
             dropblock_prob: float = 0.0,
+            dropblock_location: int = 2,
             dropblock_block_size: int = 3,
             dropout: bool = False,
             dropout_prob: float = 0.0,
@@ -561,6 +558,7 @@ def _resnet(arch_name: str,
                        num_classes=num_classes,
                        dropblock=dropblock,
                        dropblock_prob=dropblock_prob,
+                       dropblock_location=dropblock_location,
                        dropblock_block_size=dropblock_block_size,
                        dropout=dropout,
                        dropout_prob=dropout_prob,
@@ -583,6 +581,7 @@ def _resnet(arch_name: str,
                          num_classes=num_classes,
                          dropblock=dropblock,
                          dropblock_prob=dropblock_prob,
+                         dropblock_location=dropblock_location,
                          dropblock_block_size=dropblock_block_size,
                          dropout=dropout,
                          dropout_prob=dropout_prob,
@@ -608,6 +607,7 @@ def resnet18(input_channels=3,
              num_classes=1000,
              dropblock=False,
              dropblock_prob=0.0,
+             dropblock_location=2,
              dropblock_block_size=3,
              dropout=False,
              dropout_prob=0.0,
@@ -639,6 +639,7 @@ def resnet18(input_channels=3,
                    num_classes,
                    dropblock,
                    dropblock_prob,
+                   dropblock_location,
                    dropblock_block_size,
                    dropout,
                    dropout_prob,

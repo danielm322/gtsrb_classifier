@@ -120,6 +120,7 @@ def main(cfg: DictConfig) -> None:
                                 spectral_norm=cfg.model.spectral_norm,
                                 dropblock=cfg.model.drop_block,
                                 dropblock_prob=cfg.model.dropblock_prob,
+                                dropblock_location=cfg.hook_location,
                                 dropblock_block_size=cfg.model.dropblock_block_size,
                                 dropout=cfg.model.dropout,
                                 dropout_prob=cfg.model.dropout_prob,
