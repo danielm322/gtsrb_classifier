@@ -302,6 +302,10 @@ def main(cfg: DictConfig) -> None:
             mlflow.log_figure(figure=roc_curve_pca_lared,
                               artifact_file=f"figs/roc_{ood_dataset}_pca_lared.png")
 
+        # We collect all metrics to estimate global performance of all metrics
+        all_aurocs = []
+        all_auprs = []
+        all_fprs = []
         # Extract mean for each baseline across datasets
         for baseline in all_baselines:
             temp_df = pd.DataFrame(columns=['auroc', 'fpr@95', 'aupr',
@@ -313,17 +317,33 @@ def main(cfg: DictConfig) -> None:
                     temp_df.rename(index={row_name: row_name.split(baseline)[0]}, inplace=True)
 
             mlflow.log_metric(f"{baseline}_auroc_mean", temp_df["auroc"].mean())
+            all_aurocs.append(temp_df["auroc"].mean())
             mlflow.log_metric(f"{baseline}_auroc_std", temp_df["auroc"].std())
             mlflow.log_metric(f"{baseline}_aupr_mean", temp_df["aupr"].mean())
+            all_auprs.append(temp_df["aupr"].mean())
             mlflow.log_metric(f"{baseline}_aupr_std", temp_df["aupr"].std())
             mlflow.log_metric(f"{baseline}_fpr95_mean", temp_df["fpr@95"].mean())
+            all_fprs.append(temp_df["fpr@95"].mean())
             mlflow.log_metric(f"{baseline}_fpr95_std", temp_df["fpr@95"].std())
 
         # Extract mean for LaRED & LaREM across datasets
         # LaRED
-        select_and_log_best_lared_larem(overall_metrics_df, cfg.n_pca_components, technique="LaRED")
+        auroc_lared, aupr_lared, fpr_lared = select_and_log_best_lared_larem(
+            overall_metrics_df, cfg.n_pca_components, technique="LaRED", log_mlflow=True
+        )
+        all_aurocs.append(auroc_lared)
+        all_auprs.append(aupr_lared)
+        all_fprs.append(fpr_lared)
         # LaREM
-        select_and_log_best_lared_larem(overall_metrics_df, cfg.n_pca_components, technique="LaREM")
+        auroc_larem, aupr_larem, fpr_larem = select_and_log_best_lared_larem(
+            overall_metrics_df, cfg.n_pca_components, technique="LaREM", log_mlflow=True
+        )
+        all_aurocs.append(auroc_larem)
+        all_auprs.append(aupr_larem)
+        all_fprs.append(fpr_larem)
+        mlflow.log_metric(f"global_auroc_mean", np.mean(all_aurocs))
+        mlflow.log_metric(f"global_aupr_mean", np.mean(all_auprs))
+        mlflow.log_metric(f"global_fpr_mean", np.mean(all_fprs))
 
         mlflow.end_run()
 
