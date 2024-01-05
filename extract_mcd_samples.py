@@ -6,8 +6,9 @@ from omegaconf import DictConfig
 from datasets.custom_dataloaders import get_data_loaders_image_classification
 from models import ResnetModule
 from dropblock import DropBlock2D
-from ls_ood_detect_cea.uncertainty_estimation import Hook, MCDSamplesExtractor, \
-    get_msp_score, get_energy_score, MDSPostprocessor, KNNPostprocessor, get_dice_feat_mean_react_percentile
+from ls_ood_detect_cea.uncertainty_estimation import (Hook, MCDSamplesExtractor,
+    get_msp_score, get_energy_score, MDSPostprocessor, KNNPostprocessor,
+    get_dice_feat_mean_react_percentile, FastMCDSamplesExtractor)
 from ls_ood_detect_cea.uncertainty_estimation import get_dl_h_z
 import warnings
 
@@ -28,6 +29,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 N_WORKERS = os.cpu_count() - 4 if os.cpu_count() >= 8 else os.cpu_count() - 2
 EXTRACT_MCD_SAMPLES_AND_ENTROPIES = True  # set False for debugging purposes
 EXTRACT_IND = True
+# Fast extraction is not compatible with pred_h and mi baselines, they need complete forward
+# passes each time
+FAST_EXTRACTION = True  # Extract without doing complete forward passes each time
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="config.yaml")
@@ -78,25 +82,39 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
         # Extract MCDO latent samples
         #########################################################################
         # Extract MCD samples
-        mcd_extractor = MCDSamplesExtractor(
-            model=rn_model.model,
-            mcd_nro_samples=cfg.mcd_n_samples,
-            hook_dropout_layer=hooked_layer,
-            layer_type=cfg.layer_type,
-            device=device,
-            architecture=cfg.architecture,
-            location=cfg.hook_location,
-            reduction_method=cfg.reduction_method,
-            input_size=cfg.datamodule.image_width,
-            original_resnet_architecture=cfg.original_resnet_architecture,
-            return_raw_predictions=True
-        )
+        if FAST_EXTRACTION:
+            mcd_extractor = FastMCDSamplesExtractor(
+                model=rn_model.model,
+                mcd_nro_samples=cfg.mcd_n_samples,
+                hooked_layer=hooked_layer,
+                layer_type=cfg.layer_type,
+                device=device,
+                reduction_method=cfg.reduction_method,
+                return_raw_predictions=True,
+                drop_probs=cfg.model.dropblock_prob,
+                dropblock_sizes=cfg.model.dropblock_block_size
+            )
+        else:
+            mcd_extractor = MCDSamplesExtractor(
+                model=rn_model.model,
+                mcd_nro_samples=cfg.mcd_n_samples,
+                hook_dropout_layer=hooked_layer,
+                layer_type=cfg.layer_type,
+                device=device,
+                architecture=cfg.architecture,
+                location=cfg.hook_location,
+                reduction_method=cfg.reduction_method,
+                input_size=cfg.datamodule.image_width,
+                original_resnet_architecture=cfg.original_resnet_architecture,
+                return_raw_predictions=True
+            )
+
         if EXTRACT_IND:
             # Extract and save InD samples and entropies
             ind_valid_test_entropies = []
             for split, data_loader in ind_dataset_dict.items():
                 print(f"\nExtracting InD {cfg.ind_dataset} {split}")
-                mcd_samples, mcd_preds = mcd_extractor.get_ls_mcd_samples_baselines(data_loader)
+                mcd_samples, mcd_preds = mcd_extractor.get_ls_mcd_samples(data_loader)
                 torch.save(
                     mcd_samples,
                     f"{save_dir}/{cfg.ind_dataset}_{split}_{mcd_samples.shape[0]}_{mcd_samples.shape[1]}_mcd_samples.pt",
@@ -131,13 +149,13 @@ def extract_and_save_mcd_samples(cfg: DictConfig) -> None:
         # Extract and save OoD samples and entropies
         for dataset_name, data_loaders in ood_datasets_dict.items():
             print(f"Saving samples and entropies from {dataset_name}")
-            mcd_samples_ood_v, mcd_preds_ood_v = mcd_extractor.get_ls_mcd_samples_baselines(data_loaders["valid"])
+            mcd_samples_ood_v, mcd_preds_ood_v = mcd_extractor.get_ls_mcd_samples(data_loaders["valid"])
             torch.save(
                 mcd_samples_ood_v,
                 f"{save_dir}/{dataset_name}_valid_{mcd_samples_ood_v.shape[0]}_{mcd_samples_ood_v.shape[1]}_mcd_samples.pt",
             )
             torch.save(mcd_preds_ood_v, f"{save_dir}/{dataset_name}_valid_mcd_preds.pt")
-            mcd_samples_ood_t, mcd_preds_ood_t = mcd_extractor.get_ls_mcd_samples_baselines(data_loaders["test"])
+            mcd_samples_ood_t, mcd_preds_ood_t = mcd_extractor.get_ls_mcd_samples(data_loaders["test"])
             torch.save(
                 mcd_samples_ood_t,
                 f"{save_dir}/{dataset_name}_test_{mcd_samples_ood_t.shape[0]}_{mcd_samples_ood_t.shape[1]}_mcd_samples.pt",

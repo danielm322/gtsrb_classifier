@@ -29,7 +29,8 @@ def main(cfg: DictConfig) -> None:
     # Get samples folder
     mcd_samples_folder = f"./Mcd_samples/ind_{cfg.ind_dataset}/"
     save_dir = f"{mcd_samples_folder}{cfg.model_path.split('/')[2]}/{cfg.layer_type}"
-    all_baselines = ["pred_h", "mi"]
+    # all_baselines = ["pred_h", "mi"]
+    all_baselines = []
     all_baselines.extend(cfg.baselines)
     ######################################################################
     # Load all data
@@ -118,23 +119,23 @@ def main(cfg: DictConfig) -> None:
         ########################
         # Predictive uncertainty - mutual information
         # InD set
-        ind_data_dict["pred_h"], ind_data_dict["mi"] = get_predictive_uncertainty_score(
-            input_samples=torch.cat((ind_data_dict["valid_preds"], ind_data_dict["test_preds"]), dim=0),
-            mcd_nro_samples=cfg.mcd_n_samples
-        )
-        ind_data_dict["pred_h"], ind_data_dict["mi"] = \
-            ind_data_dict["pred_h"].cpu().numpy(), ind_data_dict["mi"].cpu().numpy()
-        # OoD datasets
-        for ood_dataset in cfg.ood_datasets:
-            ood_scores_dict[f"{ood_dataset} pred_h"], ood_scores_dict[f"{ood_dataset} mi"] = \
-                get_predictive_uncertainty_score(
-                    input_samples=torch.cat((ood_raw_preds_dict[f"{ood_dataset} valid"],
-                                             ood_raw_preds_dict[f"{ood_dataset} test"]), dim=0),
-                    mcd_nro_samples=cfg.mcd_n_samples
-                )
-            ood_scores_dict[f"{ood_dataset} pred_h"], ood_scores_dict[f"{ood_dataset} mi"] = \
-                ood_scores_dict[f"{ood_dataset} pred_h"].cpu().numpy(), ood_scores_dict[
-                    f"{ood_dataset} mi"].cpu().numpy()
+        # ind_data_dict["pred_h"], ind_data_dict["mi"] = get_predictive_uncertainty_score(
+        #     input_samples=torch.cat((ind_data_dict["valid_preds"], ind_data_dict["test_preds"]), dim=0),
+        #     mcd_nro_samples=cfg.mcd_n_samples
+        # )
+        # ind_data_dict["pred_h"], ind_data_dict["mi"] = \
+        #     ind_data_dict["pred_h"].cpu().numpy(), ind_data_dict["mi"].cpu().numpy()
+        # # OoD datasets
+        # for ood_dataset in cfg.ood_datasets:
+        #     ood_scores_dict[f"{ood_dataset} pred_h"], ood_scores_dict[f"{ood_dataset} mi"] = \
+        #         get_predictive_uncertainty_score(
+        #             input_samples=torch.cat((ood_raw_preds_dict[f"{ood_dataset} valid"],
+        #                                      ood_raw_preds_dict[f"{ood_dataset} test"]), dim=0),
+        #             mcd_nro_samples=cfg.mcd_n_samples
+        #         )
+        #     ood_scores_dict[f"{ood_dataset} pred_h"], ood_scores_dict[f"{ood_dataset} mi"] = \
+        #         ood_scores_dict[f"{ood_dataset} pred_h"].cpu().numpy(), ood_scores_dict[
+        #             f"{ood_dataset} mi"].cpu().numpy()
 
         # Dictionary that defines experiments names, InD and OoD datasets
         # We use some negative uncertainty scores to align with the convention that positive
@@ -289,14 +290,14 @@ def main(cfg: DictConfig) -> None:
                               artifact_file=f"figs/roc_{ood_dataset}.png")
             roc_curve_pca_larem = save_roc_ood_detector(
                 results_table=temp_df_pca_larem,
-                plot_title=f"ROC {cfg.ind_dataset} vs {ood_dataset} LareM PCA {hook_layer_type} layer"
+                plot_title=f"ROC {cfg.ind_dataset} vs {ood_dataset} LaREM PCA {hook_layer_type} layer"
             )
             # Log the plot with mlflow
             mlflow.log_figure(figure=roc_curve_pca_larem,
                               artifact_file=f"figs/roc_{ood_dataset}_pca_larem.png")
             roc_curve_pca_lared = save_roc_ood_detector(
                 results_table=temp_df_pca_lared,
-                plot_title=f"ROC {cfg.ind_dataset} vs {ood_dataset} LareD PCA {cfg.layer_type} layer"
+                plot_title=f"ROC {cfg.ind_dataset} vs {ood_dataset} LaRED PCA {hook_layer_type} layer"
             )
             # Log the plot with mlflow
             mlflow.log_figure(figure=roc_curve_pca_lared,
@@ -328,14 +329,14 @@ def main(cfg: DictConfig) -> None:
 
         # Extract mean for LaRED & LaREM across datasets
         # LaRED
-        auroc_lared, aupr_lared, fpr_lared = select_and_log_best_lared_larem(
+        auroc_lared, aupr_lared, fpr_lared, best_comp_lared = select_and_log_best_lared_larem(
             overall_metrics_df, cfg.n_pca_components, technique="LaRED", log_mlflow=True
         )
         all_aurocs.append(auroc_lared)
         all_auprs.append(aupr_lared)
         all_fprs.append(fpr_lared)
         # LaREM
-        auroc_larem, aupr_larem, fpr_larem = select_and_log_best_lared_larem(
+        auroc_larem, aupr_larem, fpr_larem, best_comp_larem = select_and_log_best_lared_larem(
             overall_metrics_df, cfg.n_pca_components, technique="LaREM", log_mlflow=True
         )
         all_aurocs.append(auroc_larem)
